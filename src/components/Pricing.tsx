@@ -3,14 +3,18 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Check, Zap, Crown, Rocket } from "lucide-react";
+import { Check, Zap, Crown, Rocket, MessageCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const Pricing = () => {
+  const handleWhatsAppContact = () => {
+    window.open('https://wa.me/qr/LMAV2IFGFOFFF1', '_blank');
+  };
+
   const plans = [
     {
       name: "Mensal",
-      price: "R$ 97",
+      price: "R$ 150",
       period: "/mês",
       description: "Para pequenos negócios",
       icon: <Zap className="w-6 h-6" />,
@@ -19,7 +23,7 @@ const Pricing = () => {
         "Respostas automáticas com IA",
         "Integração com Mercado Livre",
         "Analytics básicos",
-        "Suporte por email",
+        "Suporte por WhatsApp",
         "Atualizações automáticas"
       ],
       popular: false,
@@ -27,13 +31,13 @@ const Pricing = () => {
     },
     {
       name: "Trimestral",
-      price: "R$ 247",
+      price: "R$ 397",
       period: "/3 meses",
-      description: "3 meses pelo preço de 2,5",
+      description: "3 meses com desconto especial",
       icon: <Crown className="w-6 h-6" />,
       features: [
         "Tudo do plano mensal",
-        "15% de desconto",
+        "12% de desconto",
         "Analytics avançados",
         "Suporte prioritário",
         "Relatórios personalizados",
@@ -44,13 +48,13 @@ const Pricing = () => {
     },
     {
       name: "Anual",
-      price: "R$ 777",
+      price: "R$ 1.497",
       period: "/ano",
       description: "Máximo valor para seu negócio",
       icon: <Rocket className="w-6 h-6" />,
       features: [
         "Tudo dos planos anteriores",
-        "33% de desconto",
+        "17% de desconto",
         "Suporte VIP 24/7",
         "Consultoria mensal gratuita",
         "Recursos beta exclusivos",
@@ -130,7 +134,7 @@ const Pricing = () => {
                     ))}
                   </ul>
 
-                  <div className="mt-8">
+                  <div className="mt-8 space-y-3">
                     <Link to="/auth">
                       <Button 
                         className={`w-full py-6 text-lg font-semibold ${
@@ -143,6 +147,15 @@ const Pricing = () => {
                         {plan.buttonText}
                       </Button>
                     </Link>
+                    
+                    <Button 
+                      onClick={handleWhatsAppContact}
+                      variant="outline" 
+                      className="w-full py-3 text-sm font-medium hover:bg-green-50 hover:border-green-300 hover:text-green-700"
+                    >
+                      <MessageCircle className="w-4 h-4 mr-2" />
+                      Falar no WhatsApp
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -160,9 +173,19 @@ const Pricing = () => {
           <p className="text-gray-600 mb-4">
             Todos os planos incluem <strong>suporte completo</strong> e <strong>atualizações gratuitas</strong>
           </p>
-          <p className="text-sm text-gray-500">
-            Precisa de algo personalizado? <Link to="/auth" className="text-blue-600 hover:underline">Entre em contato</Link>
-          </p>
+          <div className="flex items-center justify-center space-x-4">
+            <p className="text-sm text-gray-500">
+              Dúvidas sobre os planos?
+            </p>
+            <Button 
+              onClick={handleWhatsAppContact}
+              variant="link" 
+              className="text-blue-600 hover:text-blue-700 p-0 h-auto font-medium"
+            >
+              <MessageCircle className="w-4 h-4 mr-1" />
+              Conversar no WhatsApp
+            </Button>
+          </div>
         </motion.div>
       </div>
     </section>

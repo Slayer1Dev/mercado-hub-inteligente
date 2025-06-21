@@ -177,7 +177,7 @@ const AdminDashboard = () => {
         activeUsers: activeCount?.length || 0,
         pendingUsers: pendingCount?.length || 0,
         onlineUsers: onlineCount?.length || 0,
-        monthlyRevenue: (activeCount?.length || 0) * 97
+        monthlyRevenue: (activeCount?.length || 0) * 150
       });
     } catch (error) {
       console.error('Error loading stats:', error);
@@ -295,7 +295,11 @@ const AdminDashboard = () => {
                 <span className="text-sm font-medium">(11) 9 4897-3101</span>
               </div>
               <Link to="/dashboard">
-                <Button variant="outline" size="sm" className="border-white text-white hover:bg-white hover:text-blue-600">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="border-white text-white hover:bg-white hover:text-blue-600 font-medium px-4 py-2"
+                >
                   Dashboard Usuário
                 </Button>
               </Link>
@@ -660,10 +664,10 @@ const UserEditForm = ({ user, onUpdate, onUpdateSubscription, onUpdateNotes }: {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="trial">Trial (7 dias)</SelectItem>
-                <SelectItem value="monthly">Mensal - R$ 97</SelectItem>
-                <SelectItem value="quarterly">Trimestral - R$ 267</SelectItem>
-                <SelectItem value="annual">Anual - R$ 997</SelectItem>
-                <SelectItem value="lifetime">Vitalício - R$ 1.997</SelectItem>
+                <SelectItem value="monthly">Mensal - R$ 150</SelectItem>
+                <SelectItem value="quarterly">Trimestral - R$ 397</SelectItem>
+                <SelectItem value="annual">Anual - R$ 1.497</SelectItem>
+                <SelectItem value="lifetime">Vitalício - R$ 2.997</SelectItem>
               </SelectContent>
             </Select>
           </div>

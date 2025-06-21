@@ -1,309 +1,179 @@
 
 import { motion } from "framer-motion";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
-import { 
-  Package, 
-  Bot, 
-  TrendingUp, 
-  DollarSign, 
-  AlertCircle, 
-  Settings,
-  BarChart3,
-  MessageSquare,
-  LogOut
-} from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import ProtectedRoute from "@/components/ProtectedRoute";
-import { toast } from "sonner";
+import { Link } from "react-router-dom";
+import { Settings, Package, Bot, BarChart3, Link as LinkIcon, MessageCircle } from "lucide-react";
+import DashboardStats from "@/components/DashboardStats";
 
 const Dashboard = () => {
-  const { user, profile, subscription, isAdmin, signOut } = useAuth();
+  const { user, profile, signOut } = useAuth();
 
-  const handleSignOut = async () => {
-    const { error } = await signOut();
-    if (error) {
-      toast.error('Erro ao fazer logout');
-    } else {
-      toast.success('Logout realizado com sucesso');
+  const handleWhatsAppContact = () => {
+    window.open('https://wa.me/qr/LMAV2IFGFOFFF1', '_blank');
+  };
+
+  const quickActions = [
+    {
+      title: "Gestão de Estoque",
+      description: "Gerencie seus produtos e estoque",
+      icon: <Package className="w-6 h-6" />,
+      href: "/stock-management",
+      color: "from-blue-500 to-blue-600"
+    },
+    {
+      title: "Respostas IA",
+      description: "Configure respostas automáticas",
+      icon: <Bot className="w-6 h-6" />,
+      href: "/ai-responses",
+      color: "from-purple-500 to-purple-600"
+    },
+    {
+      title: "Analytics",
+      description: "Veja relatórios detalhados",
+      icon: <BarChart3 className="w-6 h-6" />,
+      href: "/analytics",
+      color: "from-green-500 to-green-600"
+    },
+    {
+      title: "Integrações",
+      description: "Conecte suas contas",
+      icon: <LinkIcon className="w-6 h-6" />,
+      href: "/settings",
+      color: "from-orange-500 to-orange-600"
     }
-  };
-
-  // Mock data - em produção viria do banco de dados
-  const stats = {
-    totalProducts: 156,
-    activeProducts: 142,
-    pendingQuestions: 23,
-    aiResponses: 89,
-    monthlyRevenue: 15420,
-    stockAlerts: 5
-  };
+  ];
 
   return (
-    <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50">
-        {/* Header */}
-        <div className="bg-white shadow-sm border-b">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-16">
-              <Link to="/" className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                  <Package className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-xl font-bold text-gradient">Hub Ferramentas</span>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+              <p className="text-sm text-gray-600">Hub de Ferramentas</p>
+            </div>
+            
+            <div className="flex items-center space-x-4">
+              <Button
+                onClick={handleWhatsAppContact}
+                variant="outline"
+                size="sm"
+                className="hover:bg-green-50 hover:border-green-300 hover:text-green-700"
+              >
+                <MessageCircle className="w-4 h-4 mr-2" />
+                Suporte
+              </Button>
+              
+              <Link to="/settings">
+                <Button variant="outline" size="sm">
+                  <Settings className="w-4 h-4 mr-2" />
+                  Configurações
+                </Button>
               </Link>
               
-              <div className="flex items-center space-x-4">
-                <div className="text-sm text-gray-600">
-                  Olá, <strong>{profile?.name || user?.email}</strong>
-                </div>
-                {isAdmin && (
-                  <Link to="/admin">
-                    <Button variant="outline" size="sm" className="bg-red-50 border-red-200 text-red-700 hover:bg-red-100">
-                      Admin
-                    </Button>
-                  </Link>
-                )}
-                <Link to="/settings">
-                  <Button variant="outline" size="sm">
-                    <Settings className="w-4 h-4 mr-2" />
-                    Configurações
-                  </Button>
-                </Link>
-                <Button variant="outline" size="sm" onClick={handleSignOut}>
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Sair
-                </Button>
-              </div>
+              <Button variant="outline" size="sm" onClick={signOut}>
+                Sair
+              </Button>
             </div>
           </div>
         </div>
+      </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Welcome Section */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="mb-8"
-          >
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard Central</h1>
-            <p className="text-gray-600">Visão geral das suas vendas e automações</p>
-            
-            {/* Subscription Info */}
-            {subscription && (
-              <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-blue-800">
-                      <strong>Plano Atual:</strong> {subscription.plan_type}
-                    </p>
-                    <p className="text-sm text-blue-800">
-                      <strong>Status:</strong> {subscription.plan_status}
-                    </p>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Welcome Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8"
+        >
+          <Card className="border-0 shadow-sm bg-gradient-to-r from-blue-600 to-indigo-700 text-white">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold mb-2">
+                    Bem-vindo, {profile?.name || user?.email?.split('@')[0]}!
+                  </h2>
+                  <p className="text-blue-100">
+                    Seus negócios estão funcionando perfeitamente. Confira suas métricas abaixo.
+                  </p>
+                </div>
+                <div className="hidden md:block">
+                  <div className="bg-white/10 backdrop-blur-sm rounded-full p-4">
+                    <BarChart3 className="w-12 h-12 text-white" />
                   </div>
-                  {subscription.expires_at && (
-                    <div className="text-right">
-                      <p className="text-sm text-blue-800">
-                        <strong>Expira em:</strong>
-                      </p>
-                      <p className="text-sm text-blue-600">
-                        {new Date(subscription.expires_at).toLocaleDateString('pt-BR')}
-                      </p>
-                    </div>
-                  )}
                 </div>
               </div>
-            )}
-          </motion.div>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-          {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-            >
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Produtos Ativos</CardTitle>
-                  <Package className="h-4 w-4 text-blue-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-blue-600">{stats.activeProducts}</div>
-                  <p className="text-xs text-gray-600">de {stats.totalProducts} total</p>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-            >
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Respostas IA</CardTitle>
-                  <Bot className="h-4 w-4 text-purple-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-purple-600">{stats.aiResponses}</div>
-                  <p className="text-xs text-gray-600">este mês</p>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-            >
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Receita Mensal</CardTitle>
-                  <DollarSign className="h-4 w-4 text-green-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-green-600">
-                    R$ {stats.monthlyRevenue.toLocaleString()}
-                  </div>
-                  <p className="text-xs text-gray-600">+12% vs mês anterior</p>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.4 }}
-            >
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Alertas</CardTitle>
-                  <AlertCircle className="h-4 w-4 text-orange-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-orange-600">{stats.stockAlerts}</div>
-                  <p className="text-xs text-gray-600">produtos em baixo estoque</p>
-                </CardContent>
-              </Card>
-            </motion.div>
-          </div>
-
-          {/* Main Features Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            {/* Gestão de Estoque */}
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5, delay: 0.5 }}
-            >
-              <Card className="h-full">
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Package className="w-5 h-5 mr-2 text-blue-600" />
-                    Gestão de Estoque
-                  </CardTitle>
-                  <CardDescription>
-                    Controle seus produtos em múltiplos anúncios
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="p-4 bg-blue-50 rounded-lg">
-                    <p className="text-sm text-blue-800 mb-2">Status da Integração</p>
-                    <div className="flex items-center justify-between">
-                      <span className="text-blue-600 font-medium">Mercado Livre</span>
-                      <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
-                        Aguardando Conexão
-                      </span>
+        {/* Quick Actions */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="mb-8"
+        >
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Ações Rápidas</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {quickActions.map((action, index) => (
+              <Link key={index} to={action.href}>
+                <Card className="border-0 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer group">
+                  <CardContent className="p-6">
+                    <div className={`w-12 h-12 rounded-full bg-gradient-to-r ${action.color} flex items-center justify-center text-white mb-4 group-hover:scale-110 transition-transform duration-200`}>
+                      {action.icon}
                     </div>
-                  </div>
-                  <Link to="/stock-management">
-                    <Button className="w-full">
-                      Acessar Gestão de Estoque
-                    </Button>
-                  </Link>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            {/* Respostas IA */}
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5, delay: 0.6 }}
-            >
-              <Card className="h-full">
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Bot className="w-5 h-5 mr-2 text-purple-600" />
-                    Respostas Automáticas
-                  </CardTitle>
-                  <CardDescription>
-                    IA responde perguntas dos seus clientes
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="p-4 bg-purple-50 rounded-lg">
-                    <p className="text-sm text-purple-800 mb-2">Status da IA</p>
-                    <div className="flex items-center justify-between">
-                      <span className="text-purple-600 font-medium">Gemini AI</span>
-                      <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
-                        Configuração Pendente
-                      </span>
-                    </div>
-                  </div>
-                  <Link to="/ai-responses">
-                    <Button className="w-full">
-                      Acessar Respostas IA
-                    </Button>
-                  </Link>
-                </CardContent>
-              </Card>
-            </motion.div>
+                    <h4 className="font-semibold text-gray-900 mb-2">{action.title}</h4>
+                    <p className="text-sm text-gray-600">{action.description}</p>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
           </div>
+        </motion.div>
 
-          {/* Quick Actions */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.7 }}
-          >
-            <Card>
-              <CardHeader>
-                <CardTitle>Ações Rápidas</CardTitle>
-                <CardDescription>
-                  Acesse rapidamente as principais funcionalidades
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Link to="/analytics">
-                    <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center">
-                      <BarChart3 className="w-6 h-6 mb-2" />
-                      <span>Analytics</span>
-                    </Button>
-                  </Link>
-                  <Link to="/ai-responses">
-                    <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center">
-                      <MessageSquare className="w-6 h-6 mb-2" />
-                      <span>Perguntas</span>
-                    </Button>
-                  </Link>
-                  <Link to="/settings">
-                    <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center">
-                      <Settings className="w-6 h-6 mb-2" />
-                      <span>Configurações</span>
-                    </Button>
-                  </Link>
+        {/* Dashboard Stats */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Suas Métricas</h3>
+          <DashboardStats />
+        </motion.div>
+
+        {/* Contact Support */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="mt-8"
+        >
+          <Card className="border-0 shadow-sm bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-green-900 mb-2">Precisa de Ajuda?</h3>
+                  <p className="text-green-700">
+                    Fale diretamente com nosso suporte técnico no WhatsApp. Lucas está pronto para te ajudar!
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        </div>
+                <Button
+                  onClick={handleWhatsAppContact}
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                >
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  Falar no WhatsApp
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
-    </ProtectedRoute>
+    </div>
   );
 };
 
