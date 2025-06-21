@@ -11,6 +11,9 @@ import AdminDashboard from "./pages/AdminDashboard";
 import Settings from "./pages/Settings";
 import Billing from "./pages/Billing";
 import NotFound from "./pages/NotFound";
+import StockManagement from "./pages/StockManagement";
+import AiResponses from "./pages/AiResponses";
+import Analytics from "./pages/Analytics";
 
 const queryClient = new QueryClient();
 
@@ -51,6 +54,30 @@ const App = () => (
             element={
               <SignedIn>
                 <Billing />
+              </SignedIn>
+            } 
+          />
+          <Route 
+            path="/stock-management" 
+            element={
+              <SignedIn>
+                <StockManagement />
+              </SignedIn>
+            } 
+          />
+          <Route 
+            path="/ai-responses" 
+            element={
+              <SignedIn>
+                <AiResponses />
+              </SignedIn>
+            } 
+          />
+          <Route 
+            path="/analytics" 
+            element={
+              <SignedIn>
+                <Analytics />
               </SignedIn>
             } 
           />

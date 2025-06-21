@@ -86,14 +86,11 @@ const Hero = () => {
           ) : (
             <SignUpButton>
               <Button size="lg" className="bg-white text-blue-600 hover:bg-gray-100 px-8 py-4 text-lg">
-                Começar Grátis
+                Começar Agora
                 <ArrowRight className="ml-2 w-5 h-5" />
               </Button>
             </SignUpButton>
           )}
-          <Button variant="outline" size="lg" className="border-white text-white hover:bg-white hover:text-blue-600 px-8 py-4 text-lg">
-            Ver Demo
-          </Button>
         </motion.div>
 
         {/* Feature Icons */}

@@ -1,73 +1,395 @@
-# Welcome to your Lovable project
 
-## Project info
+# Hub Ferramentas - SaaS para Vendedores do Mercado Livre
 
-**URL**: https://lovable.dev/projects/836b3d5b-7fb0-4e41-b860-8251a2270fe4
+## 📋 Índice
+- [Visão Geral](#visão-geral)
+- [Arquitetura do Sistema](#arquitetura-do-sistema)
+- [Estrutura do Projeto](#estrutura-do-projeto)
+- [Tecnologias Utilizadas](#tecnologias-utilizadas)
+- [Funcionalidades](#funcionalidades)
+- [Sistema de Autenticação](#sistema-de-autenticação)
+- [Controle de Acesso](#controle-de-acesso)
+- [Páginas e Componentes](#páginas-e-componentes)
+- [Configuração e Instalação](#configuração-e-instalação)
+- [Deploy e Produção](#deploy-e-produção)
+- [Manutenção e Atualizações](#manutenção-e-atualizações)
 
-## How can I edit this code?
+## 🎯 Visão Geral
 
-There are several ways of editing your application.
+O Hub Ferramentas é uma plataforma SaaS (Software as a Service) desenvolvida especificamente para vendedores do Mercado Livre que desejam automatizar e otimizar suas operações de venda. A plataforma oferece três ferramentas principais:
 
-**Use Lovable**
+1. **Gestão Inteligente de Estoque** - Sincronização automática de produtos entre múltiplos anúncios
+2. **Respostas Automáticas com IA** - Sistema de atendimento automatizado usando Inteligência Artificial
+3. **Analytics Avançado** - Relatórios e métricas detalhadas para otimização de vendas
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/836b3d5b-7fb0-4e41-b860-8251a2270fe4) and start prompting.
+### Modelo de Negócio
+- **Tipo**: SaaS por assinatura mensal
+- **Valor**: R$ 149,90/mês
+- **Controle de Acesso**: Manual (liberação após pagamento e contato)
+- **Target**: Vendedores do Mercado Livre que buscam automação e crescimento
 
-Changes made via Lovable will be committed automatically to this repo.
+## 🏗️ Arquitetura do Sistema
 
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+### Frontend (React + TypeScript)
+```
+┌─────────────────────────────────────┐
+│           FRONTEND LAYER            │
+├─────────────────────────────────────┤
+│ • React 18 + TypeScript             │
+│ • Vite (Build Tool)                 │
+│ • Tailwind CSS (Styling)           │
+│ • Framer Motion (Animations)       │
+│ • React Router (Navigation)        │
+│ • Shadcn/ui (Component Library)    │
+└─────────────────────────────────────┘
 ```
 
-**Edit a file directly in GitHub**
+### Autenticação (Clerk)
+```
+┌─────────────────────────────────────┐
+│         AUTHENTICATION LAYER        │
+├─────────────────────────────────────┤
+│ • Clerk.com (Auth Provider)         │
+│ • Email/Password Authentication     │
+│ • User Profile Management          │
+│ • Session Management               │
+│ • Protected Routes                 │
+└─────────────────────────────────────┘
+```
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Controle de Acesso Personalizado
+```
+┌─────────────────────────────────────┐
+│         ACCESS CONTROL LAYER        │
+├─────────────────────────────────────┤
+│ • Custom Hook (useAccessControl)    │
+│ • Email-based Access List          │
+│ • Manual Approval System           │
+│ • Payment Verification Process     │
+└─────────────────────────────────────┘
+```
 
-**Use GitHub Codespaces**
+## 📁 Estrutura do Projeto
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```
+src/
+├── components/                 # Componentes reutilizáveis
+│   ├── ui/                    # Componentes base (shadcn/ui)
+│   ├── AccessDenied.tsx       # Tela de acesso negado
+│   ├── Features.tsx           # Seção de recursos (homepage)
+│   ├── Hero.tsx               # Seção hero (homepage)
+│   ├── Navbar.tsx             # Navegação principal
+│   └── Pricing.tsx            # Seção de preços
+│
+├── pages/                     # Páginas da aplicação
+│   ├── Index.tsx              # Homepage
+│   ├── Dashboard.tsx          # Dashboard principal
+│   ├── AdminDashboard.tsx     # Dashboard administrativo
+│   ├── Settings.tsx           # Configurações
+│   ├── Billing.tsx            # Faturamento
+│   ├── StockManagement.tsx    # Gestão de Estoque
+│   ├── AiResponses.tsx        # Respostas IA
+│   ├── Analytics.tsx          # Analytics
+│   └── NotFound.tsx           # Página 404
+│
+├── hooks/                     # Custom Hooks
+│   ├── useAccessControl.tsx   # Controle de acesso
+│   ├── use-mobile.tsx         # Detecção mobile
+│   └── use-toast.ts           # Sistema de toasts
+│
+├── lib/                       # Utilities
+│   └── utils.ts               # Funções utilitárias
+│
+├── App.tsx                    # Componente raiz
+├── main.tsx                   # Entry point
+└── index.css                  # Estilos globais
+```
 
-## What technologies are used for this project?
+## 💻 Tecnologias Utilizadas
 
-This project is built with:
+### Core Framework
+- **React 18.3.1** - Library JavaScript para interfaces
+- **TypeScript** - Superset JavaScript com tipagem estática
+- **Vite** - Build tool moderna e rápida
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+### Styling & UI
+- **Tailwind CSS 3.4.1** - Framework CSS utility-first
+- **Shadcn/ui** - Biblioteca de componentes baseada em Radix UI
+- **Framer Motion 12.18.1** - Biblioteca de animações
+- **Lucide React 0.462.0** - Biblioteca de ícones
 
-## How can I deploy this project?
+### Autenticação & Estado
+- **Clerk React 5.32.0** - Serviço de autenticação
+- **TanStack React Query 5.56.2** - Gerenciamento de estado servidor
+- **React Router DOM 6.26.2** - Roteamento client-side
 
-Simply open [Lovable](https://lovable.dev/projects/836b3d5b-7fb0-4e41-b860-8251a2270fe4) and click on Share -> Publish.
+### Funcionalidades Adicionais
+- **React Hook Form 7.53.0** - Gerenciamento de formulários
+- **React Intersection Observer 9.16.0** - Observer para scroll
+- **Date-fns 3.6.0** - Manipulação de datas
+- **Recharts 2.12.7** - Biblioteca de gráficos
 
-## Can I connect a custom domain to my Lovable project?
+## ⚙️ Funcionalidades
 
-Yes, you can!
+### 1. Homepage (Landing Page)
+- **Hero Section**: Apresentação da proposta de valor
+- **Features Section**: Demonstração das três ferramentas principais
+- **Pricing Section**: Plano único de R$ 149,90/mês
+- **Navegação Suave**: Scroll automático para seções
+- **Call-to-Actions**: Botões de cadastro integrados com Clerk
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+### 2. Sistema de Autenticação
+- **Registro**: Cadastro via email/senha através do Clerk
+- **Login**: Autenticação segura
+- **Perfil**: Gerenciamento de dados do usuário
+- **Sessões**: Manutenção automática de sessões ativas
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+### 3. Controle de Acesso Manual
+- **Verificação**: Sistema personalizado que verifica email do usuário
+- **Lista de Aprovados**: Array de emails liberados (em `useAccessControl.tsx`)
+- **Tela de Bloqueio**: Interface amigável para usuários não aprovados
+- **Processo de Liberação**: Instruções claras para contato e pagamento
+
+### 4. Dashboard Principal
+- **Métricas**: Visão geral de produtos, vendas e IA
+- **Navegação**: Acesso rápido a todas as ferramentas
+- **Status**: Indicadores de configuração e integração
+- **Responsivo**: Interface adaptativa para mobile/desktop
+
+### 5. Gestão de Estoque
+- **Sincronização**: Preparado para integração com API do Mercado Livre
+- **Alertas**: Sistema de notificações para estoque baixo
+- **Múltiplos Anúncios**: Gerenciamento centralizado
+- **Relatórios**: Movimentação e histórico de produtos
+
+### 6. Respostas IA
+- **Configuração**: Setup para integração com Gemini AI
+- **Automação**: Respostas automáticas para perguntas frequentes
+- **Aprendizado**: Sistema preparado para machine learning
+- **Métricas**: Acompanhamento de performance da IA
+
+### 7. Analytics
+- **Dashboards**: Gráficos de vendas e performance
+- **KPIs**: Métricas-chave de negócio
+- **Relatórios**: Exportação de dados
+- **Insights**: Análises automáticas e recomendações
+
+## 🔐 Sistema de Autenticação
+
+### Configuração do Clerk
+```typescript
+// main.tsx - Configuração principal
+const PUBLISHABLE_KEY = "pk_test_Y2hlZXJmdWwtZ3JpZmZvbi03LmNsZXJrLmFjY291bnRzLmRldiQ";
+
+createRoot(document.getElementById("root")!).render(
+  <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
+    <App />
+  </ClerkProvider>
+);
+```
+
+### Proteção de Rotas
+```typescript
+// App.tsx - Proteção com SignedIn
+<Route 
+  path="/dashboard" 
+  element={
+    <SignedIn>
+      <Dashboard />
+    </SignedIn>
+  } 
+/>
+```
+
+### Componentes de Autenticação
+- `<SignInButton>` - Botão de login
+- `<SignUpButton>` - Botão de cadastro  
+- `<UserButton>` - Menu do usuário
+- `<SignedIn>` - Wrapper para usuários logados
+- `<SignedOut>` - Wrapper para usuários não logados
+
+## 🛡️ Controle de Acesso
+
+### Hook useAccessControl
+```typescript
+// hooks/useAccessControl.tsx
+const APPROVED_USERS = [
+  // Lista de emails aprovados
+  "usuario@exemplo.com"
+];
+
+export const useAccessControl = () => {
+  const { user, isLoaded } = useUser();
+  
+  const hasAccess = () => {
+    if (!isLoaded || !user) return false;
+    const userEmail = user.emailAddresses[0]?.emailAddress;
+    return APPROVED_USERS.includes(userEmail || "");
+  };
+
+  return { hasAccess: hasAccess(), isLoaded, userEmail: getUserEmail() };
+};
+```
+
+### Fluxo de Acesso
+1. **Usuário se cadastra** via Clerk
+2. **Sistema verifica** se email está na lista de aprovados
+3. **Se NÃO aprovado**: Mostra tela AccessDenied
+4. **Se aprovado**: Libera acesso completo ao dashboard
+
+### Processo de Liberação
+1. **Usuário entra em contato** via WhatsApp/telefone
+2. **Informa email cadastrado** no sistema
+3. **Realiza pagamento** de R$ 149,90
+4. **Admin adiciona email** na lista APPROVED_USERS
+5. **Acesso liberado** automaticamente
+
+## 📱 Páginas e Componentes
+
+### Homepage (Index.tsx)
+- **Componentes**: Navbar, Hero, Features, Pricing
+- **Funcionalidades**: Navegação suave, animações, CTAs
+- **Responsividade**: Mobile-first design
+
+### Dashboard (Dashboard.tsx)
+- **Controle de Acesso**: Verificação obrigatória
+- **Métricas**: Cards com dados simulados
+- **Navegação**: Links para ferramentas específicas
+- **Loading States**: Estados de carregamento
+
+### Ferramentas Específicas
+1. **StockManagement.tsx**: Interface de gestão de estoque
+2. **AiResponses.tsx**: Painel de respostas automáticas
+3. **Analytics.tsx**: Dashboard de métricas e relatórios
+
+### AccessDenied.tsx
+- **Informações**: Instruções claras de liberação
+- **Contatos**: WhatsApp, telefone, email
+- **Preços**: Valor da mensalidade
+- **UX**: Interface amigável e profissional
+
+## 🚀 Configuração e Instalação
+
+### Pré-requisitos
+```bash
+Node.js >= 18.0.0
+npm >= 8.0.0
+```
+
+### Instalação Local
+```bash
+# 1. Clone o repositório
+git clone <URL_DO_REPOSITORIO>
+cd hub-ferramentas
+
+# 2. Instale dependências
+npm install
+
+# 3. Configure variáveis de ambiente
+# Crie arquivo .env.local com:
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
+
+# 4. Execute em desenvolvimento
+npm run dev
+
+# 5. Build para produção
+npm run build
+```
+
+### Configuração do Clerk
+1. **Acesse**: https://clerk.com
+2. **Crie conta** e novo projeto
+3. **Configure**: Email/password authentication
+4. **Copie**: Publishable Key
+5. **Cole**: Em VITE_CLERK_PUBLISHABLE_KEY
+
+### Configuração de Usuários Aprovados
+```typescript
+// Edite: src/hooks/useAccessControl.tsx
+const APPROVED_USERS = [
+  "cliente1@email.com",
+  "cliente2@email.com",
+  // Adicione emails aqui
+];
+```
+
+## 🌐 Deploy e Produção
+
+### Deploy na Lovable
+1. **Clique**: Botão "Publish" no Lovable
+2. **Domínio**: Configurado automaticamente
+3. **SSL**: Certificado automático
+
+### Deploy Manual
+```bash
+# Build de produção
+npm run build
+
+# Upload para servidor
+# Arquivos em dist/ devem ser servidos estaticamente
+```
+
+### Variáveis de Ambiente de Produção
+```bash
+VITE_CLERK_PUBLISHABLE_KEY=pk_live_...  # Chave de produção
+```
+
+### Configurações de Domínio
+- **Domínio gratuito**: *.lovable.app
+- **Domínio customizado**: Configure nas configurações do projeto
+
+## 🔧 Manutenção e Atualizações
+
+### Liberação de Novos Usuários
+1. **Receba contato** do cliente
+2. **Confirme pagamento** via PIX/cartão
+3. **Adicione email** em APPROVED_USERS
+4. **Redeploye** a aplicação
+5. **Confirme acesso** com o cliente
+
+### Monitoramento
+- **Clerk Dashboard**: Estatísticas de usuários
+- **Analytics**: Métricas de uso da plataforma
+- **Logs**: Acompanhamento de erros
+
+### Atualizações Frequentes
+```bash
+# Atualizar dependências
+npm update
+
+# Verificar vulnerabilidades
+npm audit
+
+# Build e teste
+npm run build
+```
+
+### Integrações Futuras
+1. **Mercado Livre API**: Para sincronização real de produtos
+2. **Gemini AI**: Para respostas automáticas reais
+3. **Sistema de Pagamento**: Stripe para cobrança automática
+4. **Banco de Dados**: Para persistência de dados
+
+## 📞 Suporte e Contato
+
+### Para Desenvolvedores
+- **Documentação**: Este README
+- **Códigos**: Comentários inline no código
+- **Estrutura**: Organização modular e clara
+
+### Para Clientes
+- **WhatsApp**: (11) 99999-9999
+- **Email**: suporte@hubferramentas.com
+- **Horário**: Segunda a sexta, 9h às 18h
+
+---
+
+## 🎯 Próximos Passos
+
+1. **Substitua** o número de telefone em `AccessDenied.tsx`
+2. **Configure** email de suporte real
+3. **Implemente** integrações com APIs externas
+4. **Adicione** sistema de pagamento automatizado
+5. **Configure** banco de dados para persistência
+
+Este sistema está pronto para uso com controle manual de acesso. Para automatizar completamente, considere integrar com Stripe para pagamentos e banco de dados para gerenciamento de usuários.

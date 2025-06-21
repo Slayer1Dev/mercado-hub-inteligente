@@ -10,6 +10,22 @@ const Navbar = () => {
   const { isSignedIn } = useUser();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
+  const scrollToFeatures = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    const featuresSection = document.getElementById('features');
+    if (featuresSection) {
+      featuresSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const scrollToPricing = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    const pricingSection = document.getElementById('pricing');
+    if (pricingSection) {
+      pricingSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
     <motion.nav 
       initial={{ y: -100, opacity: 0 }}
@@ -30,12 +46,12 @@ const Navbar = () => {
             <Link to="/" className="text-gray-700 hover:text-blue-600 transition-colors">
               Home
             </Link>
-            <Link to="#features" className="text-gray-700 hover:text-blue-600 transition-colors">
+            <a href="#features" onClick={scrollToFeatures} className="text-gray-700 hover:text-blue-600 transition-colors cursor-pointer">
               Recursos
-            </Link>
-            <Link to="#pricing" className="text-gray-700 hover:text-blue-600 transition-colors">
+            </a>
+            <a href="#pricing" onClick={scrollToPricing} className="text-gray-700 hover:text-blue-600 transition-colors cursor-pointer">
               Preços
-            </Link>
+            </a>
             
             {isSignedIn ? (
               <div className="flex items-center space-x-4">
@@ -50,7 +66,7 @@ const Navbar = () => {
                   <Button variant="outline">Entrar</Button>
                 </SignInButton>
                 <SignUpButton>
-                  <Button>Começar Grátis</Button>
+                  <Button>Começar Agora</Button>
                 </SignUpButton>
               </div>
             )}
@@ -76,8 +92,8 @@ const Navbar = () => {
           >
             <div className="px-2 pt-2 pb-3 space-y-1">
               <Link to="/" className="block px-3 py-2 text-gray-700">Home</Link>
-              <Link to="#features" className="block px-3 py-2 text-gray-700">Recursos</Link>
-              <Link to="#pricing" className="block px-3 py-2 text-gray-700">Preços</Link>
+              <a href="#features" onClick={scrollToFeatures} className="block px-3 py-2 text-gray-700 cursor-pointer">Recursos</a>
+              <a href="#pricing" onClick={scrollToPricing} className="block px-3 py-2 text-gray-700 cursor-pointer">Preços</a>
               {isSignedIn ? (
                 <div className="flex flex-col space-y-2 px-3 py-2">
                   <Link to="/dashboard">
@@ -91,7 +107,7 @@ const Navbar = () => {
                     <Button variant="outline" className="w-full">Entrar</Button>
                   </SignInButton>
                   <SignUpButton>
-                    <Button className="w-full">Começar Grátis</Button>
+                    <Button className="w-full">Começar Agora</Button>
                   </SignUpButton>
                 </div>
               )}

@@ -74,7 +74,7 @@ const Pricing = () => {
             </SignUpButton>
 
             <p className="text-center text-sm text-gray-500 mt-4">
-              Teste grátis por 7 dias • Cancele quando quiser
+              Entre em contato para ativação • Cancele quando quiser
             </p>
           </div>
         </motion.div>

@@ -14,8 +14,29 @@ import {
   BarChart3,
   MessageSquare
 } from "lucide-react";
+import { useAccessControl } from "@/hooks/useAccessControl";
+import AccessDenied from "@/components/AccessDenied";
 
 const Dashboard = () => {
+  const { hasAccess, isLoaded } = useAccessControl();
+
+  // Show loading while checking access
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Verificando acesso...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show access denied if user doesn't have access
+  if (!hasAccess) {
+    return <AccessDenied />;
+  }
+
   // Mock data - em produção viria do banco de dados
   const stats = {
     totalProducts: 156,
@@ -165,10 +186,11 @@ const Dashboard = () => {
                     </span>
                   </div>
                 </div>
-                <Button className="w-full" disabled>
-                  Conectar Mercado Livre
-                  <span className="ml-2 text-xs">(Em breve)</span>
-                </Button>
+                <Link to="/stock-management">
+                  <Button className="w-full">
+                    Acessar Gestão de Estoque
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
           </motion.div>
@@ -199,10 +221,11 @@ const Dashboard = () => {
                     </span>
                   </div>
                 </div>
-                <Button className="w-full" disabled>
-                  Configurar IA
-                  <span className="ml-2 text-xs">(Em breve)</span>
-                </Button>
+                <Link to="/ai-responses">
+                  <Button className="w-full">
+                    Acessar Respostas IA
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
           </motion.div>
@@ -223,14 +246,18 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Button variant="outline" className="h-20 flex flex-col items-center justify-center" disabled>
-                  <BarChart3 className="w-6 h-6 mb-2" />
-                  <span>Relatórios</span>
-                </Button>
-                <Button variant="outline" className="h-20 flex flex-col items-center justify-center" disabled>
-                  <MessageSquare className="w-6 h-6 mb-2" />
-                  <span>Perguntas</span>
-                </Button>
+                <Link to="/analytics">
+                  <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center">
+                    <BarChart3 className="w-6 h-6 mb-2" />
+                    <span>Analytics</span>
+                  </Button>
+                </Link>
+                <Link to="/ai-responses">
+                  <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center">
+                    <MessageSquare className="w-6 h-6 mb-2" />
+                    <span>Perguntas</span>
+                  </Button>
+                </Link>
                 <Link to="/settings">
                   <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center">
                     <Settings className="w-6 h-6 mb-2" />
