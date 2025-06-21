@@ -9,16 +9,168 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      admin_logs: {
+        Row: {
+          action: string
+          admin_user_id: string
+          created_at: string
+          details: Json | null
+          id: string
+          target_user_id: string | null
+        }
+        Insert: {
+          action: string
+          admin_user_id: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          target_user_id?: string | null
+        }
+        Update: {
+          action?: string
+          admin_user_id?: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          target_user_id?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          is_online: boolean | null
+          last_login: string | null
+          name: string | null
+          notes: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id: string
+          is_online?: boolean | null
+          last_login?: string | null
+          name?: string | null
+          notes?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          is_online?: boolean | null
+          last_login?: string | null
+          name?: string | null
+          notes?: string | null
+        }
+        Relationships: []
+      }
+      user_integrations: {
+        Row: {
+          created_at: string
+          credentials: Json | null
+          id: string
+          integration_type: string
+          is_connected: boolean | null
+          last_sync: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credentials?: Json | null
+          id?: string
+          integration_type: string
+          is_connected?: boolean | null
+          last_sync?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credentials?: Json | null
+          id?: string
+          integration_type?: string
+          is_connected?: boolean | null
+          last_sync?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["user_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["user_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["user_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_subscriptions: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          id: string
+          plan_status: Database["public"]["Enums"]["plan_status"]
+          plan_type: Database["public"]["Enums"]["plan_type"]
+          started_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          plan_status?: Database["public"]["Enums"]["plan_status"]
+          plan_type?: Database["public"]["Enums"]["plan_type"]
+          started_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          plan_status?: Database["public"]["Enums"]["plan_status"]
+          plan_type?: Database["public"]["Enums"]["plan_type"]
+          started_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_admin: {
+        Args: { user_id: string }
+        Returns: boolean
+      }
+      update_user_online_status: {
+        Args: { is_online: boolean }
+        Returns: undefined
+      }
     }
     Enums: {
-      [_ in never]: never
+      plan_status: "active" | "expired" | "cancelled" | "pending"
+      plan_type: "trial" | "monthly" | "quarterly" | "annual" | "lifetime"
+      user_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -133,6 +285,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      plan_status: ["active", "expired", "cancelled", "pending"],
+      plan_type: ["trial", "monthly", "quarterly", "annual", "lifetime"],
+      user_role: ["admin", "user"],
+    },
   },
 } as const

@@ -4,8 +4,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { SignedIn, SignedOut } from "@clerk/clerk-react";
 import Index from "./pages/Index";
+import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import Settings from "./pages/Settings";
@@ -14,6 +14,7 @@ import NotFound from "./pages/NotFound";
 import StockManagement from "./pages/StockManagement";
 import AiResponses from "./pages/AiResponses";
 import Analytics from "./pages/Analytics";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -25,60 +26,61 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/auth" element={<Auth />} />
           <Route 
             path="/dashboard" 
             element={
-              <SignedIn>
+              <ProtectedRoute>
                 <Dashboard />
-              </SignedIn>
+              </ProtectedRoute>
             } 
           />
           <Route 
             path="/admin" 
             element={
-              <SignedIn>
+              <ProtectedRoute requireAdmin={true}>
                 <AdminDashboard />
-              </SignedIn>
+              </ProtectedRoute>
             } 
           />
           <Route 
             path="/settings" 
             element={
-              <SignedIn>
+              <ProtectedRoute>
                 <Settings />
-              </SignedIn>
+              </ProtectedRoute>
             } 
           />
           <Route 
             path="/billing" 
             element={
-              <SignedIn>
+              <ProtectedRoute>
                 <Billing />
-              </SignedIn>
+              </ProtectedRoute>
             } 
           />
           <Route 
             path="/stock-management" 
             element={
-              <SignedIn>
+              <ProtectedRoute>
                 <StockManagement />
-              </SignedIn>
+              </ProtectedRoute>
             } 
           />
           <Route 
             path="/ai-responses" 
             element={
-              <SignedIn>
+              <ProtectedRoute>
                 <AiResponses />
-              </SignedIn>
+              </ProtectedRoute>
             } 
           />
           <Route 
             path="/analytics" 
             element={
-              <SignedIn>
+              <ProtectedRoute>
                 <Analytics />
-              </SignedIn>
+              </ProtectedRoute>
             } 
           />
           <Route path="*" element={<NotFound />} />

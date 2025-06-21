@@ -1,82 +1,168 @@
 
 import { motion } from "framer-motion";
-import { useInView } from "react-intersection-observer";
 import { Button } from "@/components/ui/button";
-import { Check } from "lucide-react";
-import { SignUpButton } from "@clerk/clerk-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Check, Zap, Crown, Rocket } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const Pricing = () => {
-  const [ref, inView] = useInView({
-    triggerOnce: true,
-    threshold: 0.1,
-  });
+  const plans = [
+    {
+      name: "Mensal",
+      price: "R$ 97",
+      period: "/mês",
+      description: "Para pequenos negócios",
+      icon: <Zap className="w-6 h-6" />,
+      features: [
+        "Gestão de estoque ilimitada",
+        "Respostas automáticas com IA",
+        "Integração com Mercado Livre",
+        "Analytics básicos",
+        "Suporte por email",
+        "Atualizações automáticas"
+      ],
+      popular: false,
+      buttonText: "Começar Agora"
+    },
+    {
+      name: "Trimestral",
+      price: "R$ 247",
+      period: "/3 meses",
+      description: "3 meses pelo preço de 2,5",
+      icon: <Crown className="w-6 h-6" />,
+      features: [
+        "Tudo do plano mensal",
+        "15% de desconto",
+        "Analytics avançados",
+        "Suporte prioritário",
+        "Relatórios personalizados",
+        "Backup automático"
+      ],
+      popular: true,
+      buttonText: "Melhor Oferta"
+    },
+    {
+      name: "Anual",
+      price: "R$ 777",
+      period: "/ano",
+      description: "Máximo valor para seu negócio",
+      icon: <Rocket className="w-6 h-6" />,
+      features: [
+        "Tudo dos planos anteriores",
+        "33% de desconto",
+        "Suporte VIP 24/7",
+        "Consultoria mensal gratuita",
+        "Recursos beta exclusivos",
+        "API personalizada"
+      ],
+      popular: false,
+      buttonText: "Investir no Sucesso"
+    }
+  ];
 
   return (
-    <section id="pricing" className="py-20 bg-white">
+    <section id="pricing" className="py-20 bg-gradient-to-br from-blue-50 to-purple-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div
-          ref={ref}
-          initial={{ opacity: 0, y: 30 }}
-          animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.8 }}
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
           className="text-center mb-16"
         >
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-            Preço <span className="text-gradient">Simples</span>
+          <h2 className="text-4xl font-bold text-gray-900 mb-4">
+            Planos que <span className="text-gradient">Impulsionam</span> Seu Negócio
           </h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Um plano completo com tudo que você precisa para transformar suas vendas
+            Escolha o plano ideal para automatizar suas vendas e maximizar seus resultados
           </p>
         </motion.div>
 
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+          {plans.map((plan, index) => (
+            <motion.div
+              key={plan.name}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: index * 0.1 }}
+              className="h-full"
+            >
+              <Card className={`relative h-full flex flex-col ${
+                plan.popular 
+                  ? 'border-2 border-purple-500 shadow-2xl scale-105' 
+                  : 'border border-gray-200 shadow-lg'
+              }`}>
+                {plan.popular && (
+                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                    <Badge className="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-4 py-1">
+                      Mais Popular
+                    </Badge>
+                  </div>
+                )}
+                
+                <CardHeader className="text-center pb-8">
+                  <div className={`mx-auto w-12 h-12 rounded-full flex items-center justify-center mb-4 ${
+                    plan.popular 
+                      ? 'bg-gradient-to-r from-purple-100 to-blue-100 text-purple-600' 
+                      : 'bg-gray-100 text-gray-600'
+                  }`}>
+                    {plan.icon}
+                  </div>
+                  <CardTitle className="text-2xl font-bold">{plan.name}</CardTitle>
+                  <CardDescription className="text-gray-600">
+                    {plan.description}
+                  </CardDescription>
+                  <div className="mt-4">
+                    <span className="text-4xl font-bold text-gray-900">{plan.price}</span>
+                    <span className="text-gray-600">{plan.period}</span>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="flex-1 flex flex-col">
+                  <ul className="space-y-4 flex-1">
+                    {plan.features.map((feature, featureIndex) => (
+                      <li key={featureIndex} className="flex items-start">
+                        <Check className="w-5 h-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
+                        <span className="text-gray-700">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <div className="mt-8">
+                    <Link to="/auth">
+                      <Button 
+                        className={`w-full py-6 text-lg font-semibold ${
+                          plan.popular
+                            ? 'bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600'
+                            : ''
+                        }`}
+                        variant={plan.popular ? "default" : "outline"}
+                      >
+                        {plan.buttonText}
+                      </Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
+        </div>
+
         <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={inView ? { opacity: 1, scale: 1 } : {}}
-          transition={{ duration: 0.8, delay: 0.2 }}
-          className="max-w-lg mx-auto"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, delay: 0.4 }}
+          className="text-center mt-12"
         >
-          <div className="bg-gradient-to-br from-blue-50 to-purple-50 p-8 rounded-3xl shadow-2xl border-2 border-blue-200 relative overflow-hidden">
-            <div className="absolute top-0 right-0 bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-2 rounded-bl-2xl">
-              <span className="text-sm font-semibold">MAIS POPULAR</span>
-            </div>
-            
-            <div className="text-center mb-8">
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">Plano Completo</h3>
-              <div className="flex items-center justify-center mb-4">
-                <span className="text-5xl font-bold text-gradient">R$ 149</span>
-                <span className="text-gray-600 ml-2">,90/mês</span>
-              </div>
-              <p className="text-gray-600">Tudo que você precisa para escalar suas vendas</p>
-            </div>
-
-            <div className="space-y-4 mb-8">
-              {[
-                "Gestão ilimitada de estoque",
-                "Respostas automáticas com IA",
-                "Dashboard completo com métricas",
-                "Integração com Mercado Livre",
-                "Suporte prioritário",
-                "Atualizações automáticas",
-                "Relatórios detalhados",
-                "Configurações avançadas"
-              ].map((feature, index) => (
-                <div key={index} className="flex items-center">
-                  <Check className="w-5 h-5 text-green-500 mr-3" />
-                  <span className="text-gray-700">{feature}</span>
-                </div>
-              ))}
-            </div>
-
-            <SignUpButton>
-              <Button className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white py-4 text-lg font-semibold rounded-xl">
-                Começar Agora
-              </Button>
-            </SignUpButton>
-
-            <p className="text-center text-sm text-gray-500 mt-4">
-              Entre em contato para ativação • Cancele quando quiser
-            </p>
-          </div>
+          <p className="text-gray-600 mb-4">
+            Todos os planos incluem <strong>suporte completo</strong> e <strong>atualizações gratuitas</strong>
+          </p>
+          <p className="text-sm text-gray-500">
+            Precisa de algo personalizado? <Link to="/auth" className="text-blue-600 hover:underline">Entre em contato</Link>
+          </p>
         </motion.div>
       </div>
     </section>
