@@ -126,7 +126,7 @@ const AdminDashboard = () => {
 
       if (error) throw error;
 
-      const formattedUsers = profiles?.map(profile => ({
+      const formattedUsers: UserData[] = profiles?.map(profile => ({
         id: profile.id,
         email: profile.email,
         name: profile.name,
@@ -134,8 +134,12 @@ const AdminDashboard = () => {
         last_login: profile.last_login,
         is_online: profile.is_online,
         notes: profile.notes,
-        subscription: profile.user_subscriptions?.[0] || null,
-        integrations: profile.user_integrations || []
+        subscription: Array.isArray(profile.user_subscriptions) 
+          ? profile.user_subscriptions[0] || null 
+          : profile.user_subscriptions || null,
+        integrations: Array.isArray(profile.user_integrations) 
+          ? profile.user_integrations 
+          : []
       })) || [];
 
       setUsers(formattedUsers);
@@ -173,7 +177,7 @@ const AdminDashboard = () => {
         activeUsers: activeCount?.length || 0,
         pendingUsers: pendingCount?.length || 0,
         onlineUsers: onlineCount?.length || 0,
-        monthlyRevenue: (activeCount?.length || 0) * 97 // Assumindo R$ 97 por usuário ativo
+        monthlyRevenue: (activeCount?.length || 0) * 97
       });
     } catch (error) {
       console.error('Error loading stats:', error);
@@ -199,7 +203,6 @@ const AdminDashboard = () => {
 
       if (error) throw error;
 
-      // Log admin action
       await supabase.from('admin_logs').insert({
         admin_user_id: user?.id,
         action: 'update_subscription',
@@ -239,11 +242,6 @@ const AdminDashboard = () => {
     }
   };
 
-  const sendMassEmail = async (emails: string[], subject: string, message: string) => {
-    // Esta funcionalidade requerirá uma Edge Function
-    toast.info('Funcionalidade de email em massa será implementada em breve');
-  };
-
   const filteredUsers = users.filter(user =>
     user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.name?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -268,30 +266,37 @@ const AdminDashboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Carregando dashboard...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando dashboard administrativo...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Admin Header */}
-      <div className="bg-red-600 text-white shadow-sm border-b">
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-3">
               <Shield className="w-8 h-8" />
-              <span className="text-xl font-bold">Admin Dashboard</span>
+              <div>
+                <span className="text-xl font-bold">Painel Administrativo</span>
+                <p className="text-blue-100 text-sm">Hub de Ferramentas</p>
+              </div>
             </div>
             
             <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2 bg-blue-500 bg-opacity-30 px-3 py-1 rounded-full">
+                <Phone className="w-4 h-4" />
+                <span className="text-sm font-medium">(11) 9 4897-3101</span>
+              </div>
               <Link to="/dashboard">
-                <Button variant="outline" size="sm" className="border-white text-white hover:bg-white hover:text-red-600">
-                  Dashboard Usuario
+                <Button variant="outline" size="sm" className="border-white text-white hover:bg-white hover:text-blue-600">
+                  Dashboard Usuário
                 </Button>
               </Link>
             </div>
@@ -300,229 +305,297 @@ const AdminDashboard = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome */}
+        {/* Welcome Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Painel Administrativo</h1>
-          <p className="text-gray-600">Gestão completa do sistema Hub de Ferramentas</p>
+          <div className="bg-white rounded-lg shadow-sm p-6 border border-blue-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">Bem-vindo, Administrador</h1>
+                <p className="text-gray-600">Gestão completa do sistema Hub de Ferramentas</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-gray-500">Suporte Técnico</p>
+                <p className="font-semibold text-blue-600">Lucas - hubdeferramentas@gmail.com</p>
+                <p className="text-sm text-gray-600">(11) 9 4897-3101</p>
+              </div>
+            </div>
+          </div>
         </motion.div>
 
-        {/* Stats Grid */}
+        {/* Enhanced Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Usuários Totais</CardTitle>
-              <Users className="h-4 w-4 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">{stats.totalUsers}</div>
-            </CardContent>
-          </Card>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <Card className="border-l-4 border-l-blue-500 hover:shadow-lg transition-shadow">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">Usuários Totais</CardTitle>
+                <Users className="h-5 w-5 text-blue-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-blue-600">{stats.totalUsers}</div>
+                <p className="text-xs text-gray-500 mt-1">Total de contas criadas</p>
+              </CardContent>
+            </Card>
+          </motion.div>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Usuários Ativos</CardTitle>
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{stats.activeUsers}</div>
-            </CardContent>
-          </Card>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <Card className="border-l-4 border-l-green-500 hover:shadow-lg transition-shadow">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">Usuários Ativos</CardTitle>
+                <CheckCircle2 className="h-5 w-5 text-green-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-green-600">{stats.activeUsers}</div>
+                <p className="text-xs text-gray-500 mt-1">Planos ativos pagos</p>
+              </CardContent>
+            </Card>
+          </motion.div>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pendentes</CardTitle>
-              <Clock className="h-4 w-4 text-orange-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-600">{stats.pendingUsers}</div>
-            </CardContent>
-          </Card>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            <Card className="border-l-4 border-l-orange-500 hover:shadow-lg transition-shadow">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">Pendentes</CardTitle>
+                <Clock className="h-5 w-5 text-orange-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-orange-600">{stats.pendingUsers}</div>
+                <p className="text-xs text-gray-500 mt-1">Aguardando ativação</p>
+              </CardContent>
+            </Card>
+          </motion.div>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Online Agora</CardTitle>
-              <Activity className="h-4 w-4 text-purple-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-purple-600">{stats.onlineUsers}</div>
-            </CardContent>
-          </Card>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            <Card className="border-l-4 border-l-purple-500 hover:shadow-lg transition-shadow">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">Online Agora</CardTitle>
+                <Activity className="h-5 w-5 text-purple-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-purple-600">{stats.onlineUsers}</div>
+                <p className="text-xs text-gray-500 mt-1">Conectados agora</p>
+              </CardContent>
+            </Card>
+          </motion.div>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Receita Mensal</CardTitle>
-              <DollarSign className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                R$ {stats.monthlyRevenue.toLocaleString()}
-              </div>
-            </CardContent>
-          </Card>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+          >
+            <Card className="border-l-4 border-l-emerald-500 hover:shadow-lg transition-shadow">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">Receita Mensal</CardTitle>
+                <DollarSign className="h-5 w-5 text-emerald-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-emerald-600">
+                  R$ {stats.monthlyRevenue.toLocaleString()}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Faturamento estimado</p>
+              </CardContent>
+            </Card>
+          </motion.div>
         </div>
 
         {/* User Management */}
-        <Card className="mb-8">
-          <CardHeader>
-            <div className="flex justify-between items-center">
-              <div>
-                <CardTitle>Gestão de Usuários</CardTitle>
-                <CardDescription>Gerencie todos os usuários do sistema</CardDescription>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+        >
+          <Card className="shadow-lg border-0">
+            <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-t-lg">
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle className="text-xl text-gray-900">Gestão de Usuários</CardTitle>
+                  <CardDescription className="text-gray-600">
+                    Gerencie todos os usuários e suas configurações do sistema
+                  </CardDescription>
+                </div>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
+                      <Mail className="w-4 h-4 mr-2" />
+                      Email em Massa
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Enviar Email em Massa</DialogTitle>
+                      <DialogDescription>
+                        Envie emails para todos os usuários ou grupos específicos
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <Label>Assunto</Label>
+                        <Input placeholder="Assunto do email" />
+                      </div>
+                      <div>
+                        <Label>Mensagem</Label>
+                        <Textarea placeholder="Conteúdo do email..." rows={5} />
+                      </div>
+                      <div>
+                        <Label>Destinatários</Label>
+                        <Select>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione o grupo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Todos os usuários</SelectItem>
+                            <SelectItem value="active">Usuários ativos</SelectItem>
+                            <SelectItem value="pending">Usuários pendentes</SelectItem>
+                            <SelectItem value="trial">Usuários em trial</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Button className="w-full">Enviar Email</Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </div>
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Mail className="w-4 h-4 mr-2" />
-                    Email em Massa
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Enviar Email em Massa</DialogTitle>
-                    <DialogDescription>
-                      Envie emails para todos os usuários ou grupos específicos
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div>
-                      <Label>Assunto</Label>
-                      <Input placeholder="Assunto do email" />
-                    </div>
-                    <div>
-                      <Label>Mensagem</Label>
-                      <Textarea placeholder="Conteúdo do email..." rows={5} />
-                    </div>
-                    <div>
-                      <Label>Destinatários</Label>
-                      <Select>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o grupo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Todos os usuários</SelectItem>
-                          <SelectItem value="active">Usuários ativos</SelectItem>
-                          <SelectItem value="pending">Usuários pendentes</SelectItem>
-                          <SelectItem value="trial">Usuários em trial</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <Button className="w-full">Enviar Email</Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center space-x-2 mb-4">
-              <Search className="w-4 h-4 text-gray-400" />
-              <Input
-                placeholder="Buscar usuários por email ou nome..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="max-w-sm"
-              />
-            </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="flex items-center space-x-2 mb-6">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+                  <Input
+                    placeholder="Buscar usuários por email ou nome..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
 
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Usuário</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Plano</TableHead>
-                  <TableHead>Último Acesso</TableHead>
-                  <TableHead>Integrações</TableHead>
-                  <TableHead>Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredUsers.map((userData) => (
-                  <TableRow key={userData.id}>
-                    <TableCell>
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-3 h-3 rounded-full ${userData.is_online ? 'bg-green-500' : 'bg-gray-300'}`} />
-                        <div>
-                          <div className="font-medium">{userData.name || 'Sem nome'}</div>
-                          <div className="text-sm text-gray-500">{userData.email}</div>
-                          <div className="text-xs text-gray-400">
-                            Criado em {new Date(userData.created_at).toLocaleDateString('pt-BR')}
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-gray-50">
+                    <TableRow>
+                      <TableHead className="font-semibold">Usuário</TableHead>
+                      <TableHead className="font-semibold">Status</TableHead>
+                      <TableHead className="font-semibold">Plano</TableHead>
+                      <TableHead className="font-semibold">Último Acesso</TableHead>
+                      <TableHead className="font-semibold">Integrações</TableHead>
+                      <TableHead className="font-semibold">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredUsers.map((userData) => (
+                      <TableRow key={userData.id} className="hover:bg-gray-50">
+                        <TableCell>
+                          <div className="flex items-center space-x-3">
+                            <div className={`w-3 h-3 rounded-full ${userData.is_online ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`} />
+                            <div>
+                              <div className="font-medium text-gray-900">{userData.name || 'Sem nome'}</div>
+                              <div className="text-sm text-gray-500">{userData.email}</div>
+                              <div className="text-xs text-gray-400">
+                                Criado em {new Date(userData.created_at).toLocaleDateString('pt-BR')}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        {userData.is_online ? (
-                          <Badge variant="default">Online</Badge>
-                        ) : (
-                          <Badge variant="secondary">Offline</Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>{getPlanBadge(userData.subscription)}</TableCell>
-                    <TableCell>
-                      {userData.last_login ? (
-                        <div className="text-sm">
-                          {new Date(userData.last_login).toLocaleString('pt-BR')}
-                        </div>
-                      ) : (
-                        <span className="text-gray-400">Nunca</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {userData.integrations.map((integration, idx) => (
-                          <Badge 
-                            key={idx} 
-                            variant={integration.is_connected ? "default" : "secondary"}
-                            className="text-xs"
-                          >
-                            {integration.integration_type}
-                          </Badge>
-                        ))}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => setSelectedUser(userData)}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Editar Usuário</DialogTitle>
-                            <DialogDescription>
-                              Gerencie as configurações do usuário {userData.email}
-                            </DialogDescription>
-                          </DialogHeader>
-                          {selectedUser && (
-                            <UserEditForm 
-                              user={selectedUser} 
-                              onUpdate={() => {
-                                loadUsers();
-                                setSelectedUser(null);
-                              }}
-                              onUpdateSubscription={updateUserSubscription}
-                              onUpdateNotes={updateUserNotes}
-                            />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            {userData.is_online ? (
+                              <Badge variant="default" className="bg-green-100 text-green-800">
+                                <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+                                Online
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="bg-gray-100 text-gray-600">
+                                Offline
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>{getPlanBadge(userData.subscription)}</TableCell>
+                        <TableCell>
+                          {userData.last_login ? (
+                            <div className="text-sm">
+                              {new Date(userData.last_login).toLocaleString('pt-BR')}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 text-sm">Nunca</span>
                           )}
-                        </DialogContent>
-                      </Dialog>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {userData.integrations.map((integration, idx) => (
+                              <Badge 
+                                key={idx} 
+                                variant={integration.is_connected ? "default" : "secondary"}
+                                className="text-xs"
+                              >
+                                {integration.integration_type}
+                              </Badge>
+                            ))}
+                            {userData.integrations.length === 0 && (
+                              <span className="text-xs text-gray-400">Nenhuma</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => setSelectedUser(userData)}
+                                className="hover:bg-blue-50 hover:border-blue-300"
+                              >
+                                <Edit className="w-4 h-4 mr-1" />
+                                Editar
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-2xl">
+                              <DialogHeader>
+                                <DialogTitle>Editar Usuário</DialogTitle>
+                                <DialogDescription>
+                                  Gerencie as configurações do usuário {userData.email}
+                                </DialogDescription>
+                              </DialogHeader>
+                              {selectedUser && (
+                                <UserEditForm 
+                                  user={selectedUser} 
+                                  onUpdate={() => {
+                                    loadUsers();
+                                    setSelectedUser(null);
+                                  }}
+                                  onUpdateSubscription={updateUserSubscription}
+                                  onUpdateNotes={updateUserNotes}
+                                />
+                              )}
+                            </DialogContent>
+                          </Dialog>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
     </div>
   );
@@ -558,42 +631,44 @@ const UserEditForm = ({ user, onUpdate, onUpdateSubscription, onUpdateNotes }: {
   return (
     <div className="space-y-6">
       {/* User Info */}
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <h4 className="font-medium mb-2">Informações do Usuário</h4>
-        <div className="space-y-2 text-sm">
-          <div><strong>Email:</strong> {user.email}</div>
-          <div><strong>Nome:</strong> {user.name || 'Não informado'}</div>
-          <div><strong>Cadastrado:</strong> {new Date(user.created_at).toLocaleString('pt-BR')}</div>
-          <div><strong>Último acesso:</strong> {user.last_login ? new Date(user.last_login).toLocaleString('pt-BR') : 'Nunca'}</div>
-          <div className="flex items-center space-x-2">
-            <strong>Status:</strong>
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200">
+        <h4 className="font-semibold mb-3 text-gray-900">Informações do Usuário</h4>
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div><strong className="text-gray-700">Email:</strong> <span className="text-gray-900">{user.email}</span></div>
+          <div><strong className="text-gray-700">Nome:</strong> <span className="text-gray-900">{user.name || 'Não informado'}</span></div>
+          <div><strong className="text-gray-700">Cadastrado:</strong> <span className="text-gray-900">{new Date(user.created_at).toLocaleString('pt-BR')}</span></div>
+          <div><strong className="text-gray-700">Último acesso:</strong> <span className="text-gray-900">{user.last_login ? new Date(user.last_login).toLocaleString('pt-BR') : 'Nunca'}</span></div>
+          <div className="flex items-center space-x-2 col-span-2">
+            <strong className="text-gray-700">Status:</strong>
             <div className={`w-2 h-2 rounded-full ${user.is_online ? 'bg-green-500' : 'bg-gray-300'}`} />
-            <span>{user.is_online ? 'Online' : 'Offline'}</span>
+            <span className={`font-medium ${user.is_online ? 'text-green-600' : 'text-gray-600'}`}>
+              {user.is_online ? 'Online' : 'Offline'}
+            </span>
           </div>
         </div>
       </div>
 
       {/* Subscription Management */}
       <div className="space-y-4">
-        <h4 className="font-medium">Gerenciar Assinatura</h4>
+        <h4 className="font-semibold text-gray-900">Gerenciar Assinatura</h4>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label>Tipo do Plano</Label>
+            <Label className="text-gray-700">Tipo do Plano</Label>
             <Select value={planType} onValueChange={setPlanType}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="trial">Trial (7 dias)</SelectItem>
-                <SelectItem value="monthly">Mensal</SelectItem>
-                <SelectItem value="quarterly">Trimestral</SelectItem>
-                <SelectItem value="annual">Anual</SelectItem>
-                <SelectItem value="lifetime">Vitalício</SelectItem>
+                <SelectItem value="monthly">Mensal - R$ 97</SelectItem>
+                <SelectItem value="quarterly">Trimestral - R$ 267</SelectItem>
+                <SelectItem value="annual">Anual - R$ 997</SelectItem>
+                <SelectItem value="lifetime">Vitalício - R$ 1.997</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div>
-            <Label>Status</Label>
+            <Label className="text-gray-700">Status</Label>
             <Select value={planStatus} onValueChange={setPlanStatus}>
               <SelectTrigger>
                 <SelectValue />
@@ -608,28 +683,29 @@ const UserEditForm = ({ user, onUpdate, onUpdateSubscription, onUpdateNotes }: {
           </div>
         </div>
         <div>
-          <Label>Data de Expiração</Label>
+          <Label className="text-gray-700">Data de Expiração</Label>
           <Input
             type="date"
             value={expiresAt}
             onChange={(e) => setExpiresAt(e.target.value)}
           />
         </div>
-        <Button onClick={handleUpdateSubscription} className="w-full">
+        <Button onClick={handleUpdateSubscription} className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
           Atualizar Assinatura
         </Button>
       </div>
 
       {/* Notes */}
       <div className="space-y-4">
-        <h4 className="font-medium">Observações</h4>
+        <h4 className="font-semibold text-gray-900">Observações Administrativas</h4>
         <Textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="Adicione observações sobre este usuário..."
+          placeholder="Adicione observações sobre este usuário (histórico de pagamentos, suporte, etc.)..."
           rows={4}
+          className="resize-none"
         />
-        <Button onClick={handleUpdateNotes} variant="outline" className="w-full">
+        <Button onClick={handleUpdateNotes} variant="outline" className="w-full hover:bg-gray-50">
           Salvar Observações
         </Button>
       </div>
