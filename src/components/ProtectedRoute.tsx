@@ -11,7 +11,7 @@ interface ProtectedRouteProps {
   requireAdmin?: boolean;
 }
 
-const Prot(...) ectedRoute = ({ children, requireAdmin = false }: ProtectedRouteProps) => {
+const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRouteProps) => {
   const { user, loading, hasAccess, isAdmin, subscription } = useAuth();
 
   if (loading) {
