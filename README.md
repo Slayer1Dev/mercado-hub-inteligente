@@ -1,4 +1,4 @@
-
+.
 # Hub de Ferramentas - Sistema de Gestão Completo
 
 Um sistema completo de gestão com integrações, IA e dashboard administrativo desenvolvido com React, TypeScript, Tailwind CSS e Supabase.
