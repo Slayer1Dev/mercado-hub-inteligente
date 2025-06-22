@@ -4,11 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { Link } from "react-router-dom";
-import { Settings, Package, Bot, BarChart3, Link as LinkIcon, MessageCircle } from "lucide-react";
+import { Settings, Package, Bot, BarChart3, Link as LinkIcon, MessageCircle, Shield } from "lucide-react";
 import DashboardStats from "@/components/DashboardStats";
 
 const Dashboard = () => {
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, isAdmin } = useAuth();
 
   const handleWhatsAppContact = () => {
     window.open('https://wa.me/qr/LMAV2IFGFOFFF1', '_blank');
@@ -57,6 +57,15 @@ const Dashboard = () => {
             </div>
             
             <div className="flex items-center space-x-4">
+              {isAdmin && (
+                <Link to="/admin">
+                  <Button variant="destructive" size="sm">
+                    <Shield className="w-4 h-4 mr-2" />
+                    Painel Admin
+                  </Button>
+                </Link>
+              )}
+
               <Button
                 onClick={handleWhatsAppContact}
                 variant="outline"
