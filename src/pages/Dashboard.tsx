@@ -2,13 +2,15 @@
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useClerk } from "@clerk/clerk-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Link } from "react-router-dom";
 import { Settings, Package, Bot, BarChart3, Link as LinkIcon, MessageCircle, Shield } from "lucide-react";
 import DashboardStats from "@/components/DashboardStats";
 
 const Dashboard = () => {
-  const { user, profile, signOut, isAdmin } = useAuth();
+  const { user, profile, isAdmin } = useAuth();
+  const { signOut: clerkSignOut } = useClerk();
 
   const handleWhatsAppContact = () => {
     window.open('https://wa.me/qr/LMAV2IFGFOFFF1', '_blank');
@@ -83,7 +85,7 @@ const Dashboard = () => {
                 </Button>
               </Link>
               
-              <Button variant="outline" size="sm" onClick={signOut}>
+              <Button variant="outline" size="sm" onClick={clerkSignOut}>
                 Sair
               </Button>
             </div>
