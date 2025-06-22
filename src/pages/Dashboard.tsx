@@ -40,7 +40,7 @@ const Dashboard = () => {
       title: "Integrações",
       description: "Conecte suas contas",
       icon: <LinkIcon className="w-6 h-6" />,
-      href: "/settings",
+      href: "/integrations",
       color: "from-orange-500 to-orange-600"
     }
   ];

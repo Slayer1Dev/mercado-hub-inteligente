@@ -36,6 +36,78 @@ export type Database = {
         }
         Relationships: []
       }
+      integration_logs: {
+        Row: {
+          action: string
+          created_at: string
+          details: Json | null
+          id: number
+          integration_type: string
+          message: string
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: Json | null
+          id?: number
+          integration_type: string
+          message: string
+          status: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: Json | null
+          id?: number
+          integration_type?: string
+          message?: string
+          status?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      mercado_livre_questions: {
+        Row: {
+          created_at: string
+          final_response: string | null
+          ia_response: string | null
+          id: number
+          item_id: string
+          question_date: string | null
+          question_id: string
+          question_text: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          final_response?: string | null
+          ia_response?: string | null
+          id?: number
+          item_id: string
+          question_date?: string | null
+          question_id: string
+          question_text: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          final_response?: string | null
+          ia_response?: string | null
+          id?: number
+          item_id?: string
+          question_date?: string | null
+          question_id?: string
+          question_text?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
