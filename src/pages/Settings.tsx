@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
-import { Settings, ArrowLeft, User, Save, Edit, Loader2, ShoppingBag, Bot } from "lucide-react";
+import { ArrowLeft, User, Save, Edit, Loader2, ShoppingBag, Bot, Link as LinkIcon, Settings as SettingsIcon } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from '@/integrations/supabase/client';
 
@@ -44,7 +44,7 @@ const Settings = () => {
     {
       title: "Ver Todas as Integrações",
       description: "Gerencie todas suas integrações em um só lugar",
-      icon: <Settings className="w-5 h-5" />,
+      icon: <SettingsIcon className="w-5 h-5" />,
       href: "/integrations",
       color: "from-blue-500 to-blue-600"
     },
