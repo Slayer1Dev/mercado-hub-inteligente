@@ -6,7 +6,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// ... (createLog e getValidAccessToken continuam os mesmos)
+// ... (funções createLog, getValidAccessToken, handleOAuthStart, handleOAuthCallback, handleSyncProducts, handleWebhook permanecem as mesmas)
+// A alteração principal está nas funções processSingleQuestion e handleAnswerQuestion, e no tratador de erros principal.
+
 async function createLog(supabase: any, userId: string | null, action: string, status: string, message: string, details: any = null) {
   try {
     await supabase
@@ -82,9 +84,9 @@ async function getValidAccessToken(supabase: any, userId: string) {
   return newTokens.access_token;
 }
 
-
-// NOVA FUNÇÃO LOCAL PARA GERAR RESPOSTA COM GEMINI
-async function getGeminiResponse(questionText: string, itemDetails: any) {
+// FUNÇÃO DE GERAR RESPOSTA COM GEMINI (COM LOGS DETALHADOS)
+async function getGeminiResponse(supabase: any, userId: string, questionText: string, itemDetails: any) {
+  await createLog(supabase, userId, 'generate_response', 'info', 'Iniciando geração de resposta com IA', { question: questionText });
   const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
   if (!GEMINI_API_KEY) {
     throw new Error('API Key do Gemini não configurada.');
@@ -97,20 +99,22 @@ async function getGeminiResponse(questionText: string, itemDetails: any) {
   const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: fullPrompt }] }],
-    }),
+    body: JSON.stringify({ contents: [{ parts: [{ text: fullPrompt }] }] }),
   });
 
   if (!geminiResponse.ok) {
     const errorText = await geminiResponse.text();
+    await createLog(supabase, userId, 'generate_response', 'error', `Falha na API do Gemini com status: ${geminiResponse.status}`, { error: errorText });
     throw new Error(`Falha na API do Gemini: ${errorText}`);
   }
 
   const geminiData = await geminiResponse.json();
   if (!geminiData.candidates || geminiData.candidates.length === 0) {
+    await createLog(supabase, userId, 'generate_response', 'error', 'Resposta vazia da IA.', { geminiData });
     throw new Error('Resposta vazia da IA.');
   }
+
+  await createLog(supabase, userId, 'generate_response', 'success', 'Resposta da IA gerada com sucesso.', null);
   return geminiData.candidates[0].content.parts[0].text;
 }
 
@@ -130,17 +134,16 @@ async function processSingleQuestion(supabase: any, userId: string, questionId: 
     if (!itemDetailsResponse.ok) throw new Error(`Falha ao buscar detalhes do item ${question.item_id}`);
     const itemDetails = await itemDetailsResponse.json();
 
-    // ALTERAÇÃO AQUI: Chamando a função local em vez de invocar outra função
     let ia_response = "Não foi possível gerar uma resposta com a IA.";
     try {
-        ia_response = await getGeminiResponse(question.text, {
+        ia_response = await getGeminiResponse(supabase, userId, question.text, {
             title: itemDetails.title,
             price: itemDetails.price,
             attributes: itemDetails.attributes,
         });
     } catch(e) {
         console.error("Erro ao chamar Gemini:", e.message);
-        await createLog(supabase, userId, 'generate_response', 'error', 'Erro ao chamar getGeminiResponse', { error: e.message });
+        // O log já é criado dentro de getGeminiResponse, não precisa de outro aqui.
     }
     
     const { error: upsertError } = await supabase.from('mercado_livre_questions').upsert({
@@ -156,9 +159,41 @@ async function processSingleQuestion(supabase: any, userId: string, questionId: 
     if (upsertError) throw new Error(`Erro ao salvar pergunta no banco: ${upsertError.message}`);
 }
 
+async function handleWebhook(req: Request, supabase: any) {
+  try {
+    const notification = await req.json();
+    await createLog(supabase, null, 'webhook_received', 'info', 'Notificação de webhook recebida.', notification);
 
-// ... (O resto do arquivo: handleOAuthStart, handleOAuthCallback, etc., e a função `serve` continuam iguais)
-// Para garantir, segue o restante do arquivo completo:
+    if (notification.topic === 'questions') {
+        const resourceUrl = notification.resource;
+        const questionId = resourceUrl.split('/')[2];
+        const mlUserId = notification.user_id;
+
+        const { data: userData, error: userError } = await supabase
+            .from('user_integrations')
+            .select('user_id')
+            .eq('credentials->>ml_user_id', mlUserId)
+            .single();
+
+        if (userError || !userData) {
+            throw new Error(`Usuário do sistema não encontrado para o ml_user_id: ${mlUserId}`);
+        }
+        
+        // Usamos .then() para responder OK imediatamente e processar em segundo plano
+        processSingleQuestion(supabase, userData.user_id, questionId).catch(err => {
+          createLog(supabase, userData.user_id, 'process_question_webhook', 'error', 'Erro no processamento em segundo plano do webhook', { error: err.message });
+        });
+    }
+
+    return new Response('OK', { status: 200 });
+  } catch(error) {
+    await createLog(supabase, null, 'webhook_received', 'error', 'Erro ao processar webhook.', { error: error.message });
+    return new Response('OK', { status: 200 });
+  }
+}
+
+// ... (Resto do arquivo com as outras funções: handleOAuthStart, handleOAuthCallback, etc.)
+// ... (Para garantir, o código completo está abaixo)
 async function handleOAuthStart(req: Request, supabase: any) {
   try {
     const authHeader = req.headers.get('Authorization');
@@ -425,41 +460,11 @@ async function handleAnswerQuestion(req: Request, supabase: any, user: any) {
 
     await createLog(supabase, user.id, 'answer_question', 'success', `Pergunta ${question_id} respondida com sucesso.`, null);
 
-    return new Response(JSON.stringify({ success: true, message: 'Resposta enviada com sucesso!' }));
+    return new Response(JSON.stringify({ success: true, message: 'Resposta enviada com sucesso!' }), { headers: corsHeaders });
 
   } catch (error) {
      await createLog(supabase, user.id, 'answer_question', 'error', 'Erro ao responder pergunta.', { error: error.message });
-     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
-  }
-}
-
-async function handleWebhook(req: Request, supabase: any) {
-  try {
-    const notification = await req.json();
-    await createLog(supabase, null, 'webhook_received', 'info', 'Notificação de webhook recebida.', notification);
-
-    if (notification.topic === 'questions') {
-        const resourceUrl = notification.resource;
-        const questionId = resourceUrl.split('/')[2];
-        const mlUserId = notification.user_id;
-
-        const { data: userData, error: userError } = await supabase
-            .from('user_integrations')
-            .select('user_id')
-            .eq('credentials->>ml_user_id', mlUserId)
-            .single();
-
-        if (userError || !userData) {
-            throw new Error(`Usuário do sistema não encontrado para o ml_user_id: ${mlUserId}`);
-        }
-        
-        await processSingleQuestion(supabase, userData.user_id, questionId);
-    }
-
-    return new Response('OK', { status: 200 });
-  } catch(error) {
-    await createLog(supabase, null, 'webhook_received', 'error', 'Erro ao processar webhook.', { error: error.message });
-    return new Response('OK', { status: 200 });
+     return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
   }
 }
 
@@ -492,9 +497,6 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: "Rota não encontrada" }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
   } catch (err) {
     console.error('Erro geral:', err);
-    return new Response(JSON.stringify({ error: err.message }), { 
-      status: 500,
-      headers: corsHeaders,
-    });
+    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
   }
 });
