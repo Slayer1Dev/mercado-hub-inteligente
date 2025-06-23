@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// ... (as funções createLog, getValidAccessToken, handleOAuthStart, handleOAuthCallback, handleSyncProducts, handleAnswerQuestion e handleWebhook continuam as mesmas) ...
+// ... (createLog e getValidAccessToken continuam os mesmos)
 async function createLog(supabase: any, userId: string | null, action: string, status: string, message: string, details: any = null) {
   try {
     await supabase
@@ -82,7 +82,39 @@ async function getValidAccessToken(supabase: any, userId: string) {
   return newTokens.access_token;
 }
 
-// FUNÇÃO "CÉREBRO" COM A CORREÇÃO
+
+// NOVA FUNÇÃO LOCAL PARA GERAR RESPOSTA COM GEMINI
+async function getGeminiResponse(questionText: string, itemDetails: any) {
+  const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+  if (!GEMINI_API_KEY) {
+    throw new Error('API Key do Gemini não configurada.');
+  }
+
+  const basePrompt = `Você é um assistente de vendas especialista em Mercado Livre. Responda perguntas de forma clara, profissional e persuasiva, ajudando o cliente a comprar.`;
+  const contextPrompt = itemDetails ? `\nInformações do produto: ${JSON.stringify(itemDetails, null, 2)}` : '';
+  const fullPrompt = `${basePrompt}${contextPrompt}\n\nPergunta do cliente: "${questionText}"\n\nResponda de forma direta e útil:`;
+
+  const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: fullPrompt }] }],
+    }),
+  });
+
+  if (!geminiResponse.ok) {
+    const errorText = await geminiResponse.text();
+    throw new Error(`Falha na API do Gemini: ${errorText}`);
+  }
+
+  const geminiData = await geminiResponse.json();
+  if (!geminiData.candidates || geminiData.candidates.length === 0) {
+    throw new Error('Resposta vazia da IA.');
+  }
+  return geminiData.candidates[0].content.parts[0].text;
+}
+
+
 async function processSingleQuestion(supabase: any, userId: string, questionId: string) {
     const accessToken = await getValidAccessToken(supabase, userId);
     
@@ -92,25 +124,25 @@ async function processSingleQuestion(supabase: any, userId: string, questionId: 
     if (!questionResponse.ok) throw new Error(`Falha ao buscar pergunta ${questionId}`);
     const question = await questionResponse.json();
 
-    // CORREÇÃO APLICADA AQUI: Adicionado o header de autorização
     const itemDetailsResponse = await fetch(`https://api.mercadolibre.com/items/${question.item_id}?attributes=title,price,attributes`, {
         headers: { 'Authorization': `Bearer ${accessToken}` },
     });
     if (!itemDetailsResponse.ok) throw new Error(`Falha ao buscar detalhes do item ${question.item_id}`);
     const itemDetails = await itemDetailsResponse.json();
 
-    const { data: iaData, error: iaError } = await supabase.functions.invoke('gemini-ai/generate', {
-        body: { 
-          questionText: question.text,
-          itemDetails: { title: itemDetails.title, price: itemDetails.price, attributes: itemDetails.attributes }
-        }
-    });
-
+    // ALTERAÇÃO AQUI: Chamando a função local em vez de invocar outra função
     let ia_response = "Não foi possível gerar uma resposta com a IA.";
-    if (!iaError && iaData.success) {
-      ia_response = iaData.response;
+    try {
+        ia_response = await getGeminiResponse(question.text, {
+            title: itemDetails.title,
+            price: itemDetails.price,
+            attributes: itemDetails.attributes,
+        });
+    } catch(e) {
+        console.error("Erro ao chamar Gemini:", e.message);
+        await createLog(supabase, userId, 'generate_response', 'error', 'Erro ao chamar getGeminiResponse', { error: e.message });
     }
-
+    
     const { error: upsertError } = await supabase.from('mercado_livre_questions').upsert({
         user_id: userId,
         question_id: String(question.id),
@@ -124,41 +156,9 @@ async function processSingleQuestion(supabase: any, userId: string, questionId: 
     if (upsertError) throw new Error(`Erro ao salvar pergunta no banco: ${upsertError.message}`);
 }
 
-async function handleWebhook(req: Request, supabase: any) {
-  try {
-    const notification = await req.json();
-    await createLog(supabase, null, 'webhook_received', 'info', 'Notificação de webhook recebida.', notification);
 
-    if (notification.topic === 'questions') {
-        const resourceUrl = notification.resource;
-        const questionId = resourceUrl.split('/')[2];
-        const mlUserId = notification.user_id;
-
-        const { data: userData, error: userError } = await supabase
-            .from('user_integrations')
-            .select('user_id')
-            .eq('credentials->>ml_user_id', mlUserId)
-            .single();
-
-        if (userError || !userData) {
-            throw new Error(`Usuário do sistema não encontrado para o ml_user_id: ${mlUserId}`);
-        }
-        
-        await processSingleQuestion(supabase, userData.user_id, questionId);
-    }
-
-    return new Response('OK', { status: 200 });
-  } catch(error) {
-    await createLog(supabase, null, 'webhook_received', 'error', 'Erro ao processar webhook.', { error: error.message });
-    return new Response('OK', { status: 200 });
-  }
-}
-
-// ... (resto do arquivo: handleOAuthStart, handleOAuthCallback, etc., e o servidor principal `serve`)
-// O conteúdo dessas outras funções não precisa de alteração, apenas a processSingleQuestion.
-// Para evitar erros, o ideal é você substituir apenas a função processSingleQuestion no seu código.
-// Mas para garantir, aqui está o arquivo completo:
-
+// ... (O resto do arquivo: handleOAuthStart, handleOAuthCallback, etc., e a função `serve` continuam iguais)
+// Para garantir, segue o restante do arquivo completo:
 async function handleOAuthStart(req: Request, supabase: any) {
   try {
     const authHeader = req.headers.get('Authorization');
@@ -433,6 +433,36 @@ async function handleAnswerQuestion(req: Request, supabase: any, user: any) {
   }
 }
 
+async function handleWebhook(req: Request, supabase: any) {
+  try {
+    const notification = await req.json();
+    await createLog(supabase, null, 'webhook_received', 'info', 'Notificação de webhook recebida.', notification);
+
+    if (notification.topic === 'questions') {
+        const resourceUrl = notification.resource;
+        const questionId = resourceUrl.split('/')[2];
+        const mlUserId = notification.user_id;
+
+        const { data: userData, error: userError } = await supabase
+            .from('user_integrations')
+            .select('user_id')
+            .eq('credentials->>ml_user_id', mlUserId)
+            .single();
+
+        if (userError || !userData) {
+            throw new Error(`Usuário do sistema não encontrado para o ml_user_id: ${mlUserId}`);
+        }
+        
+        await processSingleQuestion(supabase, userData.user_id, questionId);
+    }
+
+    return new Response('OK', { status: 200 });
+  } catch(error) {
+    await createLog(supabase, null, 'webhook_received', 'error', 'Erro ao processar webhook.', { error: error.message });
+    return new Response('OK', { status: 200 });
+  }
+}
+
 // SERVIDOR PRINCIPAL
 serve(async (req) => {
   if (req.method === 'OPTIONS') { return new Response('ok', { headers: corsHeaders }); }
@@ -462,6 +492,9 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: "Rota não encontrada" }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
   } catch (err) {
     console.error('Erro geral:', err);
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
+    return new Response(JSON.stringify({ error: err.message }), { 
+      status: 500,
+      headers: corsHeaders,
+    });
   }
 });
