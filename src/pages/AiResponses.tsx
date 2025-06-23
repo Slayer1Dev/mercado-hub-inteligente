@@ -2,14 +2,13 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { UserButton } from "@clerk/clerk-react";
 import { Link } from "react-router-dom";
-import { Bot, MessageSquare, Clock, ArrowLeft, Zap, RefreshCw, Loader2 } from "lucide-react";
+import { Bot, MessageSquare, Clock, ArrowLeft, Zap, RefreshCw, Loader2, Send } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Textarea } from "@/components/ui/textarea";
 
-// Definindo o tipo para as perguntas
 interface MlQuestion {
   id: number;
   question_id: string;
@@ -25,8 +24,8 @@ const AiResponses = () => {
   const [questions, setQuestions] = useState<MlQuestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [sending, setSending] = useState<string | null>(null);
 
-  // Função para buscar as perguntas do nosso banco de dados
   const fetchQuestions = async () => {
     if (!user) return;
     setLoading(true);
@@ -35,7 +34,8 @@ const AiResponses = () => {
         .from('mercado_livre_questions')
         .select('*')
         .eq('user_id', user.id)
-        .order('question_date', { ascending: false });
+        .eq('status', 'ia_answered') // Apenas perguntas pendentes
+        .order('question_date', { ascending: true });
 
       if (error) throw error;
       setQuestions(data || []);
@@ -46,12 +46,10 @@ const AiResponses = () => {
     }
   };
 
-  // Roda a busca ao carregar a página
   useEffect(() => {
     fetchQuestions();
   }, [user]);
   
-  // Função para chamar a Edge Function de sincronização de perguntas
   const handleSyncQuestions = async () => {
     setSyncing(true);
     toast.info("Buscando novas perguntas no Mercado Livre...");
@@ -59,7 +57,7 @@ const AiResponses = () => {
       const { data, error } = await supabase.functions.invoke('mercado-livre-integration/sync-questions');
       if (error) throw error;
       toast.success("Sincronização concluída!", { description: data.message });
-      await fetchQuestions(); // Atualiza a lista na tela
+      await fetchQuestions();
     } catch(error: any) {
       toast.error("Falha na sincronização de perguntas.", { description: error.message });
     } finally {
@@ -67,9 +65,34 @@ const AiResponses = () => {
     }
   };
 
-  // Calculando estatísticas com base nos dados reais
-  const pendingQuestions = questions.filter(q => q.status === 'ia_answered').length;
-  const totalAnswered = questions.filter(q => q.status !== 'ia_answered').length; // Supondo outros status como 'sent'
+  const handleAnswerChange = (questionId: string, newText: string) => {
+    setQuestions(currentQuestions =>
+      currentQuestions.map(q =>
+        q.question_id === questionId ? { ...q, ia_response: newText } : q
+      )
+    );
+  };
+
+  const handleSendResponse = async (questionId: string, text: string) => {
+    setSending(questionId);
+    try {
+      const { error } = await supabase.functions.invoke('mercado-livre-integration/answer-question', {
+        body: { question_id: questionId, text: text },
+      });
+
+      if (error) throw error;
+      
+      toast.success("Resposta enviada com sucesso!");
+      // Remove a pergunta da lista para uma UI mais rápida
+      setQuestions(currentQuestions => currentQuestions.filter(q => q.question_id !== questionId));
+    } catch (error: any) {
+      toast.error("Falha ao enviar resposta.", { description: error.message });
+    } finally {
+      setSending(null);
+    }
+  };
+
+  const pendingQuestions = questions.length;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -78,24 +101,11 @@ const AiResponses = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
-              <Link to="/dashboard">
-                <Button variant="ghost" size="sm">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Voltar
-                </Button>
-              </Link>
-              <div className="flex items-center space-x-2">
-                <Bot className="w-8 h-8 text-purple-600" />
-                <span className="text-xl font-bold text-gradient">Respostas IA</span>
-              </div>
+              <Link to="/dashboard"><Button variant="ghost" size="sm"><ArrowLeft className="w-4 h-4 mr-2" />Voltar</Button></Link>
+              <div className="flex items-center space-x-2"><Bot className="w-8 h-8 text-purple-600" /><span className="text-xl font-bold text-gradient">Respostas IA</span></div>
             </div>
-            
             <div className="flex items-center space-x-4">
-              <Button onClick={handleSyncQuestions} disabled={syncing}>
-                {syncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-                Sincronizar Perguntas
-              </Button>
-              <UserButton />
+              <Button onClick={handleSyncQuestions} disabled={syncing}>{syncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}Sincronizar Perguntas</Button>
             </div>
           </div>
         </div>
@@ -107,9 +117,9 @@ const AiResponses = () => {
           <p className="text-gray-600">Atendimento inteligente para suas perguntas no Mercado Livre</p>
         </motion.div>
 
-        {/* Stats Cards com dados reais */}
+        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Respostas Este Mês</CardTitle><Bot className="h-4 w-4 text-purple-600" /></CardHeader><CardContent><div className="text-2xl font-bold text-purple-600">{totalAnswered}</div><p className="text-xs text-gray-600">perguntas respondidas</p></CardContent></Card>
+          <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Respostas Este Mês</CardTitle><Bot className="h-4 w-4 text-purple-600" /></CardHeader><CardContent><div className="text-2xl font-bold text-purple-600">N/A</div><p className="text-xs text-gray-600">perguntas respondidas</p></CardContent></Card>
           <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Pendentes</CardTitle><MessageSquare className="h-4 w-4 text-orange-600" /></CardHeader><CardContent><div className="text-2xl font-bold text-orange-600">{pendingQuestions}</div><p className="text-xs text-gray-600">aguardando sua aprovação</p></CardContent></Card>
           <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Tempo Médio</CardTitle><Clock className="h-4 w-4 text-blue-600" /></CardHeader><CardContent><div className="text-2xl font-bold text-blue-600">N/A</div><p className="text-xs text-gray-600">para responder</p></CardContent></Card>
           <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Taxa de Satisfação</CardTitle><Zap className="h-4 w-4 text-green-600" /></CardHeader><CardContent><div className="text-2xl font-bold text-green-600">N/A</div><p className="text-xs text-gray-600">clientes satisfeitos</p></CardContent></Card>
@@ -124,37 +134,45 @@ const AiResponses = () => {
           {/* Recent Questions */}
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 0.6 }}>
             <Card className="h-full">
-              <CardHeader><CardTitle>Perguntas Recentes</CardTitle><CardDescription>Últimas interações da IA com seus clientes</CardDescription></CardHeader>
+              <CardHeader><CardTitle>Perguntas Pendentes</CardTitle><CardDescription>Aprove, edite e envie as respostas geradas pela IA</CardDescription></CardHeader>
               <CardContent>
                 {loading ? (
                     <p>Carregando perguntas...</p>
                 ) : questions.length === 0 ? (
                     <div className="text-center py-12 text-gray-500">
-                        <p>Nenhuma pergunta encontrada.</p>
-                        <p className="text-sm mt-2">Clique em "Sincronizar Perguntas" para buscar novas perguntas do Mercado Livre.</p>
+                        <p>Nenhuma pergunta pendente.</p>
+                        <p className="text-sm mt-2">Clique em "Sincronizar Perguntas" para buscar novas.</p>
                     </div>
                 ) : (
                   <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
                     {questions.map((item) => (
-                      <div key={item.id} className="p-3 bg-gray-50 rounded-lg border">
-                        <div className="flex items-start justify-between mb-2">
-                          <p className="font-medium text-sm text-gray-800">{item.question_text}</p>
-                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                            item.status === 'ia_answered' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'
-                          }`}>
-                            {item.status === 'ia_answered' ? 'Pendente' : 'Respondida'}
-                          </span>
+                      <div key={item.id} className="p-4 bg-gray-50 rounded-lg border space-y-3">
+                        <div>
+                            <p className="font-medium text-sm text-gray-800">{item.question_text}</p>
+                            <p className="text-xs text-gray-500">{new Date(item.question_date).toLocaleString('pt-BR')}</p>
                         </div>
-                        <p className="text-xs text-gray-600 mb-2 p-2 bg-white rounded">
-                          <strong className="text-purple-600">Resposta da IA:</strong> {item.ia_response}
-                        </p>
-                        <p className="text-xs text-gray-500">{new Date(item.question_date).toLocaleString('pt-BR')}</p>
+                        <Textarea
+                          value={item.ia_response}
+                          onChange={(e) => handleAnswerChange(item.question_id, e.target.value)}
+                          className="bg-white"
+                          rows={3}
+                        />
+                        <Button
+                          onClick={() => handleSendResponse(item.question_id, item.ia_response)}
+                          disabled={sending === item.question_id}
+                          className="w-full"
+                        >
+                          {sending === item.question_id ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <Send className="w-4 h-4 mr-2" />
+                          )}
+                          Enviar Resposta
+                        </Button>
                       </div>
                     ))}
                   </div>
                 )}
-                
-                <Button variant="outline" className="w-full mt-4" disabled>Ver Todas as Perguntas</Button>
               </CardContent>
             </Card>
           </motion.div>
