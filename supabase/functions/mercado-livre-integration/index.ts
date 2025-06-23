@@ -346,7 +346,7 @@ serve(async (req) => {
 
     if (pathname.includes('/oauth-callback')) { return await handleOAuthCallback(req, supabase); }
 
-    const authHeader = req.headers.get('Authorization');
+    const authHeader = req.headers.get('Authorization'); // Forçando atualização - 23/06
     if (!authHeader) { return new Response(JSON.stringify({ error: 'Token de autorização necessário' }), { status: 401, headers: corsHeaders }); }
     const { data: { user }, error: userError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
     if (userError || !user) { return new Response(JSON.stringify({ error: 'Usuário não autenticado' }), { status: 401, headers: corsHeaders }); }
