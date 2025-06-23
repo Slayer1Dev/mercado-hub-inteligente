@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
@@ -69,7 +68,6 @@ async function generateResponse(req: Request, supabase: any) {
       hasItemDetails: !!itemDetails
     });
 
-    // Construir prompt personalizado
     const basePrompt = `Você é um assistente de vendas especialista em Mercado Livre.
 Você deve responder perguntas de clientes de forma clara, profissional e persuasiva.
 Sempre seja educado, prestativo e focado em ajudar o cliente a tomar a decisão de compra.`;
@@ -90,8 +88,8 @@ Pergunta do cliente: "${questionText}"
 
 Responda de forma direta e útil:`;
 
-    // Chamar API do Gemini
-    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`, {
+    // Chamar API do Gemini (MODELO ALTERADO)
+    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -204,8 +202,8 @@ async function testConnection(req: Request, supabase: any) {
       });
     }
 
-    // Teste simples da API
-    const testResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`, {
+    // Teste simples da API (MODELO ALTERADO)
+    const testResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -222,10 +220,19 @@ async function testConnection(req: Request, supabase: any) {
     const isConnected = testResponse.ok;
     const status = isConnected ? 'success' : 'error';
     const message = isConnected ? 'Conexão com Gemini testada com sucesso' : 'Falha na conexão com Gemini';
+    
+    if (!isConnected) {
+        const errorDetails = await testResponse.json();
+        await createLog(supabase, user.id, 'test_connection', status, message, { 
+            responseStatus: testResponse.status,
+            errorDetails: errorDetails
+        });
+    } else {
+        await createLog(supabase, user.id, 'test_connection', status, message, { 
+            responseStatus: testResponse.status 
+        });
+    }
 
-    await createLog(supabase, user.id, 'test_connection', status, message, { 
-      responseStatus: testResponse.status 
-    });
 
     return new Response(JSON.stringify({ 
       connected: isConnected,
