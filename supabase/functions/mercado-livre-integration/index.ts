@@ -6,7 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// ... (função createLog continua a mesma) ...
 async function createLog(supabase: any, userId: string | null, action: string, status: string, message: string, details: any = null) {
   try {
     await supabase
@@ -24,7 +23,6 @@ async function createLog(supabase: any, userId: string | null, action: string, s
   }
 }
 
-// NOVA FUNÇÃO AUXILIAR - A "MÁGICA" ACONTECE AQUI
 async function getValidAccessToken(supabase: any, userId: string) {
   const { data: integration, error: integrationError } = await supabase
     .from('user_integrations')
@@ -40,54 +38,39 @@ async function getValidAccessToken(supabase: any, userId: string) {
   const { credentials, updated_at } = integration;
   const { access_token, refresh_token, expires_in } = credentials;
 
-  // Verifica se o token provavelmente expirou (com 5 minutos de margem de segurança)
   const expirationTime = new Date(updated_at).getTime() + (expires_in * 1000) - (5 * 60 * 1000);
   const isExpired = Date.now() > expirationTime;
 
   if (!isExpired) {
-    return access_token; // Retorna o token atual se ele ainda for válido
+    return access_token;
   }
 
-  // Se expirou, renova o token
   await createLog(supabase, userId, 'refresh_token', 'info', 'Token de acesso expirado. Renovando...', null);
 
   const ML_CLIENT_ID = Deno.env.get('ML_CLIENT_ID');
   const ML_CLIENT_SECRET = Deno.env.get('ML_CLIENT_SECRET');
-
   const body = `grant_type=refresh_token&client_id=${ML_CLIENT_ID}&client_secret=${ML_CLIENT_SECRET}&refresh_token=${refresh_token}`;
-
   const response = await fetch('https://api.mercadolibre.com/oauth/token', {
     method: 'POST',
-    headers: {
-      'Accept': 'application/json',
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
+    headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
     body: body,
   });
 
   if (!response.ok) {
     const errorData = await response.json();
     await createLog(supabase, userId, 'refresh_token', 'error', 'Falha ao renovar token.', errorData);
-    // Se falhar a renovação, o usuário talvez precise reconectar manualmente
     throw new Error('Não foi possível renovar a autenticação com o Mercado Livre. Por favor, conecte-se novamente.');
   }
 
   const newTokens = await response.json();
 
-  // Atualiza as credenciais no banco de dados com os novos tokens
   const { error: updateError } = await supabase
     .from('user_integrations')
     .update({
-      credentials: {
-        ...credentials, // Mantém credenciais antigas como ml_user_id
-        access_token: newTokens.access_token,
-        refresh_token: newTokens.refresh_token,
-        expires_in: newTokens.expires_in,
-      },
+      credentials: { ...credentials, access_token: newTokens.access_token, refresh_token: newTokens.refresh_token, expires_in: newTokens.expires_in },
       updated_at: new Date().toISOString(),
     })
-    .eq('user_id', userId)
-    .eq('integration_type', 'mercado_livre');
+    .eq('user_id', userId).eq('integration_type', 'mercado_livre');
 
   if (updateError) {
     await createLog(supabase, userId, 'refresh_token', 'error', 'Falha ao salvar novos tokens no banco de dados.', updateError);
@@ -95,11 +78,9 @@ async function getValidAccessToken(supabase: any, userId: string) {
     await createLog(supabase, userId, 'refresh_token', 'success', 'Token renovado e salvo com sucesso.', null);
   }
 
-  return newTokens.access_token; // Retorna o novo token de acesso
+  return newTokens.access_token;
 }
 
-
-// ... (handleOAuthStart e handleOAuthCallback continuam os mesmos do último código que te passei) ...
 async function handleOAuthStart(req: Request, supabase: any) {
   try {
     const authHeader = req.headers.get('Authorization');
@@ -200,7 +181,7 @@ async function handleOAuthCallback(req: Request, supabase: any) {
           expires_in: tokens.expires_in,
           token_type: tokens.token_type,
         },
-        updated_at: new Date().toISOString(), // Usando updated_at para controlar a expiração
+        updated_at: new Date().toISOString(),
       }, { onConflict: 'user_id, integration_type' });
 
     if (dbError) {
@@ -223,16 +204,12 @@ async function handleOAuthCallback(req: Request, supabase: any) {
   }
 }
 
-
-// FUNÇÃO DE SINCRONIZAÇÃO ALTERADA PARA USAR O NOVO HELPER
 async function handleSyncProducts(req: Request, supabase: any, user: any) {
   try {
     await createLog(supabase, user.id, 'sync_products', 'info', 'Iniciando sincronização de produtos.', null);
 
-    // 1. Obter um token de acesso válido (novo ou renovado)
     const accessToken = await getValidAccessToken(supabase, user.id);
     
-    // 2. Precisamos do ml_user_id, vamos buscar novamente para garantir que temos o mais recente
      const { data: integrationData } = await supabase
       .from('user_integrations')
       .select('credentials->ml_user_id')
@@ -243,8 +220,6 @@ async function handleSyncProducts(req: Request, supabase: any, user: any) {
     const mlUserId = integrationData?.ml_user_id;
     if(!mlUserId) throw new Error("ID de usuário do Mercado Livre não encontrado.");
 
-
-    // 3. Buscar IDs dos anúncios do usuário no Mercado Livre
     const itemsResponse = await fetch(`https://api.mercadolibre.com/users/${mlUserId}/items/search`, {
       headers: { 'Authorization': `Bearer ${accessToken}` }
     });
@@ -258,7 +233,6 @@ async function handleSyncProducts(req: Request, supabase: any, user: any) {
       return new Response(JSON.stringify({ message: 'Nenhum produto encontrado para sincronizar.' }));
     }
 
-    // 4. Buscar detalhes de cada anúncio em lote
     const detailsResponse = await fetch(`https://api.mercadolibre.com/items?ids=${itemIds.join(',')}`, {
       headers: { 'Authorization': `Bearer ${accessToken}` }
     });
@@ -266,7 +240,6 @@ async function handleSyncProducts(req: Request, supabase: any, user: any) {
 
     const detailsData = await detailsResponse.json();
 
-    // 5. Formatar e salvar no banco de dados
     const productsToUpsert = detailsData.map((item: any) => ({
       user_id: user.id,
       ml_item_id: item.body.id,
@@ -295,11 +268,72 @@ async function handleSyncProducts(req: Request, supabase: any, user: any) {
   }
 }
 
-// SERVIDOR PRINCIPAL (sem alterações)
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+// NOVA FUNÇÃO para sincronizar perguntas
+async function handleSyncQuestions(req: Request, supabase: any, user: any) {
+  try {
+    await createLog(supabase, user.id, 'sync_questions', 'info', 'Iniciando sincronização de perguntas.', null);
+
+    const accessToken = await getValidAccessToken(supabase, user.id);
+    const { data: integrationData } = await supabase
+      .from('user_integrations')
+      .select('credentials->ml_user_id')
+      .eq('user_id', user.id).eq('integration_type', 'mercado_livre')
+      .single();
+    const mlUserId = integrationData?.ml_user_id;
+    if(!mlUserId) throw new Error("ID de usuário do Mercado Livre não encontrado.");
+
+    const questionsResponse = await fetch(`https://api.mercadolibre.com/my/received_questions/search?seller=${mlUserId}&status=UNANSWERED`, {
+      headers: { 'Authorization': `Bearer ${accessToken}` },
+    });
+
+    if (!questionsResponse.ok) {
+      const errorBody = await questionsResponse.text();
+      throw new Error(`Falha ao buscar perguntas no Mercado Livre: ${errorBody}`);
+    }
+    const questionsData = await questionsResponse.json();
+
+    if (questionsData.questions.length === 0) {
+      await createLog(supabase, user.id, 'sync_questions', 'success', 'Nenhuma pergunta nova encontrada.', null);
+      return new Response(JSON.stringify({ message: 'Nenhuma pergunta nova encontrada.' }));
+    }
+    
+    let generatedCount = 0;
+    for (const question of questionsData.questions) {
+      const { data: iaData, error: iaError } = await supabase.functions.invoke('gemini-ai/generate', {
+        body: { questionText: question.text }
+      });
+
+      let ia_response = "Não foi possível gerar uma resposta com a IA.";
+      if (!iaError && iaData.success) {
+        ia_response = iaData.response;
+        generatedCount++;
+      }
+      
+      await supabase.from('mercado_livre_questions').upsert({
+        user_id: user.id,
+        question_id: String(question.id),
+        item_id: question.item_id,
+        question_text: question.text,
+        status: 'ia_answered',
+        ia_response: ia_response,
+        question_date: question.date_created,
+      }, { onConflict: 'question_id' });
+    }
+
+    const successMessage = `${questionsData.questions.length} perguntas encontradas, ${generatedCount} respostas geradas pela IA.`;
+    await createLog(supabase, user.id, 'sync_questions', 'success', successMessage, null);
+    return new Response(JSON.stringify({ message: successMessage }));
+
+  } catch (error) {
+    await createLog(supabase, user.id, 'sync_questions', 'error', 'Erro durante a sincronização de perguntas.', { error: error.message });
+    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
+}
+
+
+// SERVIDOR PRINCIPAL
+serve(async (req) => {
+  if (req.method === 'OPTIONS') { return new Response('ok', { headers: corsHeaders }); }
 
   try {
     const supabase = createClient(
@@ -310,37 +344,20 @@ serve(async (req) => {
     const url = new URL(req.url);
     const { pathname } = url;
 
-    if (pathname.includes('/oauth-callback')) {
-      return await handleOAuthCallback(req, supabase);
-    }
-    
+    if (pathname.includes('/oauth-callback')) { return await handleOAuthCallback(req, supabase); }
+
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Token de autorização necessário' }), { status: 401, headers: corsHeaders });
-    }
+    if (!authHeader) { return new Response(JSON.stringify({ error: 'Token de autorização necessário' }), { status: 401, headers: corsHeaders }); }
     const { data: { user }, error: userError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: 'Usuário não autenticado' }), { status: 401, headers: corsHeaders });
-    }
+    if (userError || !user) { return new Response(JSON.stringify({ error: 'Usuário não autenticado' }), { status: 401, headers: corsHeaders }); }
 
-    if (pathname.includes('/oauth-start')) {
-      return await handleOAuthStart(req, supabase);
-    }
-    
-    if (pathname.includes('/sync-products')) {
-      return await handleSyncProducts(req, supabase, user);
-    }
+    if (pathname.includes('/oauth-start')) { return await handleOAuthStart(req, supabase); }
+    if (pathname.includes('/sync-products')) { return await handleSyncProducts(req, supabase, user); }
+    if (pathname.includes('/sync-questions')) { return await handleSyncQuestions(req, supabase, user); }
 
-    return new Response(JSON.stringify({ error: "Rota não encontrada" }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 404,
-    });
-
+    return new Response(JSON.stringify({ error: "Rota não encontrada" }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
   } catch (err) {
     console.error('Erro geral:', err);
-    return new Response(JSON.stringify({ error: err.message }), { 
-      status: 500,
-      headers: corsHeaders,
-    });
+    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
   }
 });
