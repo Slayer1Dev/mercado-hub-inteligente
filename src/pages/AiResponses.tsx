@@ -1,5 +1,3 @@
-// src/pages/AiResponses.tsx
-
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,8 +7,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Textarea } from "@/components/ui/textarea";
-import AppHeader from "@/components/AppHeader"; // Importando o novo cabeçalho
+import AppHeader from "@/components/AppHeader"; // Importando o cabeçalho
 
+// ... (a interface MlQuestion e o resto da lógica do componente permanecem iguais)
 interface MlQuestion {
   id: number;
   question_id: string;
@@ -56,7 +55,7 @@ const AiResponses = () => {
           (payload) => {
             console.log('Mudança em tempo real recebida!', payload);
             toast.info("A lista de perguntas foi atualizada.");
-            fetchQuestions(); // Busca a lista inteira para garantir consistência
+            fetchQuestions();
           }
         ).subscribe();
       return () => { supabase.removeChannel(channel); };
@@ -91,7 +90,6 @@ const AiResponses = () => {
       });
       if (error) throw error;
       toast.success("Resposta enviada com sucesso!");
-      await fetchQuestions(); // CORREÇÃO DO BUG: Recarrega a lista do banco de dados
     } catch (error: any) {
       toast.error("Falha ao enviar resposta.", { description: error.message });
     } finally {
@@ -101,14 +99,15 @@ const AiResponses = () => {
 
   const pendingQuestions = questions.length;
 
+  // NOVA ESTRUTURA DO LAYOUT
   return (
-    <div className="min-h-screen bg-gray-50">
-      <AppHeader /> {/* USANDO O NOVO CABEÇALHO */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="flex flex-col min-h-screen bg-gray-50">
+      <AppHeader />
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex justify-between items-center mb-8">
             <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">Respostas Automáticas com IA</h1>
-                <p className="text-gray-600">Atendimento inteligente para suas perguntas no Mercado Livre</p>
+                <h1 className="text-3xl font-bold text-gray-900">Respostas Pendentes</h1>
+                <p className="text-gray-600">Aprove, edite e envie as respostas geradas pela IA.</p>
             </div>
             <Button onClick={handleSyncQuestions} disabled={syncing}>
                 {syncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
@@ -124,10 +123,12 @@ const AiResponses = () => {
           <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Taxa de Satisfação</CardTitle><Zap className="h-4 w-4 text-green-600" /></CardHeader><CardContent><div className="text-2xl font-bold text-green-600">N/A</div><p className="text-xs text-gray-600">clientes satisfeitos</p></CardContent></Card>
         </div>
 
-        {/* NOVO LAYOUT DE UMA COLUNA */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }}>
-          <Card>
-            <CardHeader><CardTitle>Perguntas Pendentes</CardTitle><CardDescription>Aprove, edite e envie as respostas geradas pela IA</CardDescription></CardHeader>
+        {/* Layout de uma coluna para as perguntas */}
+        <Card>
+            <CardHeader>
+                <CardTitle>Caixa de Entrada</CardTitle>
+                <CardDescription>Perguntas aguardando sua ação.</CardDescription>
+            </CardHeader>
             <CardContent>
               {loading ? (
                   <p>Carregando perguntas...</p>
@@ -156,8 +157,7 @@ const AiResponses = () => {
               )}
             </CardContent>
           </Card>
-        </motion.div>
-      </div>
+      </main>
     </div>
   );
 };
