@@ -1,8 +1,11 @@
+# supabase/config.toml
 
 project_id = "zbumnxegxvvhittxfdxh"
 
 [functions.mercado-livre-integration]
+# A verificação JWT é falsa porque o callback e o webhook são acessados externamente.
 verify_jwt = false
 
 [functions.gemini-ai]
+# A verificação JWT é falsa porque esta função só é chamada por outra função do nosso backend.
 verify_jwt = false
