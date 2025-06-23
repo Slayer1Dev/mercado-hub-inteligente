@@ -5,4 +5,4 @@ project_id = "zbumnxegxvvhittxfdxh"
 verify_jwt = false
 
 [functions.gemini-ai]
-verify_jwt = true
+verify_jwt = false
