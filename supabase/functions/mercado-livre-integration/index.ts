@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// ... (as funções createLog e getValidAccessToken continuam as mesmas) ...
+// ... (todas as outras funções como createLog, getValidAccessToken, handleOAuthStart, etc. continuam aqui, sem alterações)
 async function createLog(supabase: any, userId: string | null, action: string, status: string, message: string, details: any = null) {
   try {
     await supabase
@@ -82,7 +82,6 @@ async function getValidAccessToken(supabase: any, userId: string) {
   return newTokens.access_token;
 }
 
-// ... (as funções handleOAuthStart, handleOAuthCallback e handleSyncProducts continuam as mesmas) ...
 async function handleOAuthStart(req: Request, supabase: any) {
   try {
     const authHeader = req.headers.get('Authorization');
@@ -334,7 +333,6 @@ async function handleSyncQuestions(req: Request, supabase: any, user: any) {
   }
 }
 
-// NOVA FUNÇÃO para responder perguntas
 async function handleAnswerQuestion(req: Request, supabase: any, user: any) {
   try {
     const { question_id, text } = await req.json();
@@ -363,11 +361,10 @@ async function handleAnswerQuestion(req: Request, supabase: any, user: any) {
       throw new Error(`Falha ao enviar resposta para o Mercado Livre: ${errorBody}`);
     }
 
-    // Atualizar o status da pergunta no nosso banco
     await supabase
       .from('mercado_livre_questions')
       .update({ status: 'answered', final_response: text })
-      .eq('question_id', question_id);
+      .eq('question_id', String(question_id));
 
     await createLog(supabase, user.id, 'answer_question', 'success', `Pergunta ${question_id} respondida com sucesso.`, null);
 
@@ -376,6 +373,28 @@ async function handleAnswerQuestion(req: Request, supabase: any, user: any) {
   } catch (error) {
      await createLog(supabase, user.id, 'answer_question', 'error', 'Erro ao responder pergunta.', { error: error.message });
      return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+  }
+}
+
+// NOVA FUNÇÃO para lidar com os webhooks do ML
+async function handleWebhook(req: Request, supabase: any) {
+  try {
+    const notification = await req.json();
+
+    // Apenas registrar a notificação por enquanto
+    // O user_id aqui será null, pois a chamada vem do ML, não de um usuário logado
+    await createLog(supabase, null, 'webhook_received', 'info', 'Notificação de webhook recebida.', notification);
+    
+    // A lógica futura iria aqui:
+    // 1. Extrair o user_id e o resource (ex: /questions/12345) da notificação
+    // 2. Chamar uma função interna para processar a pergunta (buscar, gerar resposta, salvar)
+
+    // É crucial responder 200 OK rapidamente para o Mercado Livre
+    return new Response('OK', { status: 200 });
+  } catch(error) {
+    await createLog(supabase, null, 'webhook_received', 'error', 'Erro ao processar webhook.', { error: error.message });
+    // Retorna 200 mesmo em caso de erro para evitar que o ML pare de enviar webhooks
+    return new Response('OK', { status: 200 });
   }
 }
 
@@ -392,17 +411,20 @@ serve(async (req) => {
     const url = new URL(req.url);
     const { pathname } = url;
 
+    // Rotas públicas que não precisam de autenticação de usuário
     if (pathname.includes('/oauth-callback')) { return await handleOAuthCallback(req, supabase); }
+    if (pathname.includes('/webhook')) { return await handleWebhook(req, supabase); } // <-- NOVA ROTA PÚBLICA
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) { return new Response(JSON.stringify({ error: 'Token de autorização necessário' }), { status: 401, headers: corsHeaders }); }
     const { data: { user }, error: userError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
     if (userError || !user) { return new Response(JSON.stringify({ error: 'Usuário não autenticado' }), { status: 401, headers: corsHeaders }); }
 
+    // Rotas protegidas
     if (pathname.includes('/oauth-start')) { return await handleOAuthStart(req, supabase); }
     if (pathname.includes('/sync-products')) { return await handleSyncProducts(req, supabase, user); }
     if (pathname.includes('/sync-questions')) { return await handleSyncQuestions(req, supabase, user); }
-    if (pathname.includes('/answer-question')) { return await handleAnswerQuestion(req, supabase, user); } // <-- NOVA ROTA
+    if (pathname.includes('/answer-question')) { return await handleAnswerQuestion(req, supabase, user); }
 
     return new Response(JSON.stringify({ error: "Rota não encontrada" }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
   } catch (err) {
