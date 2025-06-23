@@ -1,13 +1,13 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
+// O conteúdo completo do arquivo com todas as funções anteriores (createLog, getValidAccessToken, etc.)
+// e a correção na função handleAnswerQuestion.
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-// ... (funções createLog, getValidAccessToken, handleOAuthStart, handleOAuthCallback, handleSyncProducts, handleWebhook permanecem as mesmas)
-// A alteração principal está nas funções processSingleQuestion e handleAnswerQuestion, e no tratador de erros principal.
 
 async function createLog(supabase: any, userId: string | null, action: string, status: string, message: string, details: any = null) {
   try {
@@ -84,7 +84,6 @@ async function getValidAccessToken(supabase: any, userId: string) {
   return newTokens.access_token;
 }
 
-// FUNÇÃO DE GERAR RESPOSTA COM GEMINI (COM LOGS DETALHADOS)
 async function getGeminiResponse(supabase: any, userId: string, questionText: string, itemDetails: any) {
   await createLog(supabase, userId, 'generate_response', 'info', 'Iniciando geração de resposta com IA', { question: questionText });
   const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
@@ -143,7 +142,6 @@ async function processSingleQuestion(supabase: any, userId: string, questionId: 
         });
     } catch(e) {
         console.error("Erro ao chamar Gemini:", e.message);
-        // O log já é criado dentro de getGeminiResponse, não precisa de outro aqui.
     }
     
     const { error: upsertError } = await supabase.from('mercado_livre_questions').upsert({
@@ -158,6 +156,7 @@ async function processSingleQuestion(supabase: any, userId: string, questionId: 
     
     if (upsertError) throw new Error(`Erro ao salvar pergunta no banco: ${upsertError.message}`);
 }
+
 
 async function handleWebhook(req: Request, supabase: any) {
   try {
@@ -179,7 +178,6 @@ async function handleWebhook(req: Request, supabase: any) {
             throw new Error(`Usuário do sistema não encontrado para o ml_user_id: ${mlUserId}`);
         }
         
-        // Usamos .then() para responder OK imediatamente e processar em segundo plano
         processSingleQuestion(supabase, userData.user_id, questionId).catch(err => {
           createLog(supabase, userData.user_id, 'process_question_webhook', 'error', 'Erro no processamento em segundo plano do webhook', { error: err.message });
         });
@@ -192,8 +190,7 @@ async function handleWebhook(req: Request, supabase: any) {
   }
 }
 
-// ... (Resto do arquivo com as outras funções: handleOAuthStart, handleOAuthCallback, etc.)
-// ... (Para garantir, o código completo está abaixo)
+// ... (handleOAuthStart, handleOAuthCallback, etc. - sem alterações)
 async function handleOAuthStart(req: Request, supabase: any) {
   try {
     const authHeader = req.headers.get('Authorization');
@@ -453,10 +450,16 @@ async function handleAnswerQuestion(req: Request, supabase: any, user: any) {
       throw new Error(`Falha ao enviar resposta para o Mercado Livre: ${errorBody}`);
     }
 
-    await supabase
+    // CORREÇÃO APLICADA AQUI
+    const { error: updateError } = await supabase
       .from('mercado_livre_questions')
       .update({ status: 'answered', final_response: text })
       .eq('question_id', String(question_id));
+
+    if (updateError) {
+      await createLog(supabase, user.id, 'answer_question', 'error', 'Falha ao atualizar status no banco de dados.', { error: updateError.message });
+      throw new Error(`Falha ao atualizar status da pergunta no banco: ${updateError.message}`);
+    }
 
     await createLog(supabase, user.id, 'answer_question', 'success', `Pergunta ${question_id} respondida com sucesso.`, null);
 
@@ -468,7 +471,6 @@ async function handleAnswerQuestion(req: Request, supabase: any, user: any) {
   }
 }
 
-// SERVIDOR PRINCIPAL
 serve(async (req) => {
   if (req.method === 'OPTIONS') { return new Response('ok', { headers: corsHeaders }); }
 
