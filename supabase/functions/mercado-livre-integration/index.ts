@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
@@ -122,17 +121,16 @@ async function handleOAuthCallback(req: Request, supabase: any) {
     const ML_CLIENT_SECRET = Deno.env.get('ML_CLIENT_SECRET');
     const redirectUri = `${Deno.env.get('SUPABASE_URL')}/functions/v1/mercado-livre-integration/oauth-callback`;
 
-    // Trocar código por tokens
+    // Trocar código por tokens (CÓDIGO CORRIGIDO)
+    const body = `grant_type=authorization_code&client_id=${ML_CLIENT_ID}&client_secret=${ML_CLIENT_SECRET}&code=${code}&redirect_uri=${redirectUri}`;
+
     const tokenResponse = await fetch('https://api.mercadolibre.com/oauth/token', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        client_id: ML_CLIENT_ID!,
-        client_secret: ML_CLIENT_SECRET!,
-        code,
-        redirect_uri: redirectUri,
-      }),
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: body,
     });
 
     if (!tokenResponse.ok) {
@@ -251,6 +249,7 @@ serve(async (req) => {
   }
 
   try {
+    // CÓDIGO CORRIGIDO
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SERVICE_ROLE_KEY') ?? ''
