@@ -34,7 +34,7 @@ const AiResponses = () => {
         .from('mercado_livre_questions')
         .select('*')
         .eq('user_id', user.id)
-        .eq('status', 'ia_answered') // Apenas perguntas pendentes
+        .eq('status', 'ia_answered')
         .order('question_date', { ascending: true });
 
       if (error) throw error;
@@ -46,8 +46,36 @@ const AiResponses = () => {
     }
   };
 
+  // useEffect AGORA INCLUI A LÓGICA DE REALTIME
   useEffect(() => {
-    fetchQuestions();
+    if (user) {
+      // 1. Busca os dados iniciais
+      fetchQuestions();
+
+      // 2. Cria um canal de "escuta" para a tabela de perguntas
+      const channel = supabase.channel('mercado_livre_questions_changes')
+        .on(
+          'postgres_changes',
+          { 
+            event: 'INSERT', 
+            schema: 'public', 
+            table: 'mercado_livre_questions',
+            filter: `user_id=eq.${user.id}` // Escuta apenas por inserções para o usuário atual
+          },
+          (payload) => {
+            // 3. Quando uma nova pergunta é inserida, adiciona ela à lista na tela
+            console.log('Nova pergunta recebida em tempo real!', payload.new);
+            setQuestions(currentQuestions => [...currentQuestions, payload.new as MlQuestion]);
+            toast.info("Nova pergunta recebida do Mercado Livre!");
+          }
+        )
+        .subscribe();
+
+      // 4. Função de limpeza para sair do canal quando o componente for desmontado
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
   }, [user]);
   
   const handleSyncQuestions = async () => {
@@ -83,7 +111,6 @@ const AiResponses = () => {
       if (error) throw error;
       
       toast.success("Resposta enviada com sucesso!");
-      // Remove a pergunta da lista para uma UI mais rápida
       setQuestions(currentQuestions => currentQuestions.filter(q => q.question_id !== questionId));
     } catch (error: any) {
       toast.error("Falha ao enviar resposta.", { description: error.message });
@@ -95,6 +122,7 @@ const AiResponses = () => {
   const pendingQuestions = questions.length;
 
   return (
+    // O restante do JSX continua o mesmo, sem alterações necessárias
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
@@ -141,7 +169,7 @@ const AiResponses = () => {
                 ) : questions.length === 0 ? (
                     <div className="text-center py-12 text-gray-500">
                         <p>Nenhuma pergunta pendente.</p>
-                        <p className="text-sm mt-2">Clique em "Sincronizar Perguntas" para buscar novas.</p>
+                        <p className="text-sm mt-2">Aguardando novas perguntas do Mercado Livre...</p>
                     </div>
                 ) : (
                   <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
