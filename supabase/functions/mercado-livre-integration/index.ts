@@ -300,8 +300,11 @@ async function handleSyncQuestions(req: Request, supabase: any, user: any) {
     let generatedCount = 0;
     for (const question of questionsData.questions) {
       const { data: iaData, error: iaError } = await supabase.functions.invoke('gemini-ai/generate', {
-        body: { questionText: question.text }
-      });
+  headers: {
+    'Authorization': req.headers.get('Authorization')!
+  },
+  body: { questionText: question.text }
+});
 
       let ia_response = "Não foi possível gerar uma resposta com a IA.";
       if (!iaError && iaData.success) {
