@@ -268,7 +268,6 @@ async function handleSyncProducts(req: Request, supabase: any, user: any) {
   }
 }
 
-// NOVA FUNÇÃO para sincronizar perguntas
 async function handleSyncQuestions(req: Request, supabase: any, user: any) {
   try {
     await createLog(supabase, user.id, 'sync_questions', 'info', 'Iniciando sincronização de perguntas.', null);
@@ -299,12 +298,13 @@ async function handleSyncQuestions(req: Request, supabase: any, user: any) {
     
     let generatedCount = 0;
     for (const question of questionsData.questions) {
+      // CORREÇÃO APLICADA AQUI
       const { data: iaData, error: iaError } = await supabase.functions.invoke('gemini-ai/generate', {
-  headers: {
-    'Authorization': req.headers.get('Authorization')!
-  },
-  body: { questionText: question.text }
-});
+        headers: {
+          'Authorization': req.headers.get('Authorization')!
+        },
+        body: { questionText: question.text }
+      });
 
       let ia_response = "Não foi possível gerar uma resposta com a IA.";
       if (!iaError && iaData.success) {
@@ -333,7 +333,6 @@ async function handleSyncQuestions(req: Request, supabase: any, user: any) {
   }
 }
 
-
 // SERVIDOR PRINCIPAL
 serve(async (req) => {
   if (req.method === 'OPTIONS') { return new Response('ok', { headers: corsHeaders }); }
@@ -349,7 +348,7 @@ serve(async (req) => {
 
     if (pathname.includes('/oauth-callback')) { return await handleOAuthCallback(req, supabase); }
 
-    const authHeader = req.headers.get('Authorization'); // Forçando atualização - 23/06
+    const authHeader = req.headers.get('Authorization');
     if (!authHeader) { return new Response(JSON.stringify({ error: 'Token de autorização necessário' }), { status: 401, headers: corsHeaders }); }
     const { data: { user }, error: userError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
     if (userError || !user) { return new Response(JSON.stringify({ error: 'Usuário não autenticado' }), { status: 401, headers: corsHeaders }); }
@@ -361,6 +360,9 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: "Rota não encontrada" }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
   } catch (err) {
     console.error('Erro geral:', err);
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
+    return new Response(JSON.stringify({ error: err.message }), { 
+      status: 500,
+      headers: corsHeaders,
+    });
   }
 });
