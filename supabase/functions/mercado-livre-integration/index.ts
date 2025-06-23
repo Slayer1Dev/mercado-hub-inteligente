@@ -6,6 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// ... (as funções createLog e getValidAccessToken continuam as mesmas) ...
 async function createLog(supabase: any, userId: string | null, action: string, status: string, message: string, details: any = null) {
   try {
     await supabase
@@ -81,6 +82,7 @@ async function getValidAccessToken(supabase: any, userId: string) {
   return newTokens.access_token;
 }
 
+// ... (as funções handleOAuthStart, handleOAuthCallback e handleSyncProducts continuam as mesmas) ...
 async function handleOAuthStart(req: Request, supabase: any) {
   try {
     const authHeader = req.headers.get('Authorization');
@@ -298,7 +300,6 @@ async function handleSyncQuestions(req: Request, supabase: any, user: any) {
     
     let generatedCount = 0;
     for (const question of questionsData.questions) {
-      // CORREÇÃO APLICADA AQUI
       const { data: iaData, error: iaError } = await supabase.functions.invoke('gemini-ai/generate', {
         headers: {
           'Authorization': req.headers.get('Authorization')!
@@ -333,6 +334,51 @@ async function handleSyncQuestions(req: Request, supabase: any, user: any) {
   }
 }
 
+// NOVA FUNÇÃO para responder perguntas
+async function handleAnswerQuestion(req: Request, supabase: any, user: any) {
+  try {
+    const { question_id, text } = await req.json();
+    if (!question_id || !text) {
+      throw new Error("ID da pergunta e texto da resposta são obrigatórios.");
+    }
+    
+    await createLog(supabase, user.id, 'answer_question', 'info', `Tentando responder à pergunta ${question_id}`, { text });
+
+    const accessToken = await getValidAccessToken(supabase, user.id);
+
+    const answerResponse = await fetch(`https://api.mercadolibre.com/answers`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        question_id: question_id,
+        text: text,
+      }),
+    });
+
+    if (!answerResponse.ok) {
+      const errorBody = await answerResponse.text();
+      throw new Error(`Falha ao enviar resposta para o Mercado Livre: ${errorBody}`);
+    }
+
+    // Atualizar o status da pergunta no nosso banco
+    await supabase
+      .from('mercado_livre_questions')
+      .update({ status: 'answered', final_response: text })
+      .eq('question_id', question_id);
+
+    await createLog(supabase, user.id, 'answer_question', 'success', `Pergunta ${question_id} respondida com sucesso.`, null);
+
+    return new Response(JSON.stringify({ success: true, message: 'Resposta enviada com sucesso!' }));
+
+  } catch (error) {
+     await createLog(supabase, user.id, 'answer_question', 'error', 'Erro ao responder pergunta.', { error: error.message });
+     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+  }
+}
+
 // SERVIDOR PRINCIPAL
 serve(async (req) => {
   if (req.method === 'OPTIONS') { return new Response('ok', { headers: corsHeaders }); }
@@ -356,13 +402,11 @@ serve(async (req) => {
     if (pathname.includes('/oauth-start')) { return await handleOAuthStart(req, supabase); }
     if (pathname.includes('/sync-products')) { return await handleSyncProducts(req, supabase, user); }
     if (pathname.includes('/sync-questions')) { return await handleSyncQuestions(req, supabase, user); }
+    if (pathname.includes('/answer-question')) { return await handleAnswerQuestion(req, supabase, user); } // <-- NOVA ROTA
 
     return new Response(JSON.stringify({ error: "Rota não encontrada" }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
   } catch (err) {
     console.error('Erro geral:', err);
-    return new Response(JSON.stringify({ error: err.message }), { 
-      status: 500,
-      headers: corsHeaders,
-    });
+    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
   }
 });
