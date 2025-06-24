@@ -1,189 +1,55 @@
+// src/pages/Dashboard.tsx
 
-import { motion } from "framer-motion";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { useClerk } from "@clerk/clerk-react";
-import { useAuth } from "@/hooks/useAuth";
+import AppHeader from "@/components/AppHeader";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Bot, Package, LineChart, Link as LinkIcon, Boxes } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Settings, Package, Bot, BarChart3, Link as LinkIcon, MessageCircle, Shield } from "lucide-react";
-import DashboardStats from "@/components/DashboardStats";
 
 const Dashboard = () => {
-  const { user, profile, isAdmin } = useAuth();
-  const { signOut: clerkSignOut } = useClerk();
-
-  const handleWhatsAppContact = () => {
-    window.open('https://wa.me/qr/LMAV2IFGFOFFF1', '_blank');
-  };
-
-  const quickActions = [
-    {
-      title: "Gestão de Estoque",
-      description: "Gerencie seus produtos e estoque",
-      icon: <Package className="w-6 h-6" />,
-      href: "/stock-management",
-      color: "from-blue-500 to-blue-600"
-    },
-    {
-      title: "Respostas IA",
-      description: "Configure respostas automáticas",
-      icon: <Bot className="w-6 h-6" />,
-      href: "/ai-responses",
-      color: "from-purple-500 to-purple-600"
-    },
-    {
-      title: "Analytics",
-      description: "Veja relatórios detalhados",
-      icon: <BarChart3 className="w-6 h-6" />,
-      href: "/analytics",
-      color: "from-green-500 to-green-600"
-    },
-    {
-      title: "Integrações",
-      description: "Conecte suas contas",
-      icon: <LinkIcon className="w-6 h-6" />,
-      href: "/integrations",
-      color: "from-orange-500 to-orange-600"
-    }
-  ];
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-              <p className="text-sm text-gray-600">Hub de Ferramentas</p>
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              {isAdmin && (
-                <Link to="/admin">
-                  <Button variant="destructive" size="sm">
-                    <Shield className="w-4 h-4 mr-2" />
-                    Painel Admin
-                  </Button>
-                </Link>
-              )}
+    <div className="flex flex-col min-h-screen bg-gray-50">
+      <AppHeader />
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <h1 className="text-3xl font-bold text-gray-800 mb-8">Painel de Controle</h1>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          
+          <Link to="/ai-responses">
+            <Card className="hover:shadow-lg hover:border-purple-500 transition-all">
+              <CardHeader><CardTitle className="flex items-center"><Bot className="w-6 h-6 mr-3 text-purple-600" />Respostas com IA</CardTitle></CardHeader>
+              <CardContent><CardDescription>Gerencie as perguntas de seus clientes com o poder da IA. Responda de forma rápida e inteligente.</CardDescription></CardContent>
+            </Card>
+          </Link>
+          
+          <Link to="/stock-management">
+            <Card className="hover:shadow-lg hover:border-blue-500 transition-all">
+              <CardHeader><CardTitle className="flex items-center"><Package className="w-6 h-6 mr-3 text-blue-600" />Gerenciador de Estoque</CardTitle></CardHeader>
+              <CardContent><CardDescription>Visualize e sincronize todos os seus produtos do Mercado Livre em um só lugar.</CardDescription></CardContent>
+            </Card>
+          </Link>
 
-              <Button
-                onClick={handleWhatsAppContact}
-                variant="outline"
-                size="sm"
-                className="hover:bg-green-50 hover:border-green-300 hover:text-green-700"
-              >
-                <MessageCircle className="w-4 h-4 mr-2" />
-                Suporte
-              </Button>
-              
-              <Link to="/settings">
-                <Button variant="outline" size="sm">
-                  <Settings className="w-4 h-4 mr-2" />
-                  Configurações
-                </Button>
-              </Link>
-              
-              <Button variant="outline" size="sm" onClick={clerkSignOut}>
-                Sair
-              </Button>
-            </div>
-          </div>
+          <Link to="/stock-groups">
+            <Card className="hover:shadow-lg hover:border-green-500 transition-all">
+              <CardHeader><CardTitle className="flex items-center"><Boxes className="w-6 h-6 mr-3 text-green-600" />Grupos de Estoque</CardTitle></CardHeader>
+              <CardContent><CardDescription>Agrupe anúncios idênticos para sincronizar o estoque automaticamente entre eles.</CardDescription></CardContent>
+            </Card>
+          </Link>
+
+          <Link to="/analytics">
+            <Card className="hover:shadow-lg hover:border-red-500 transition-all">
+              <CardHeader><CardTitle className="flex items-center"><LineChart className="w-6 h-6 mr-3 text-red-600" />Análises e Relatórios</CardTitle></CardHeader>
+              <CardContent><CardDescription>Entenda suas vendas, performance e tome decisões baseadas em dados. (Em breve)</CardDescription></CardContent>
+            </Card>
+          </Link>
+
+          <Link to="/integrations">
+            <Card className="hover:shadow-lg hover:border-yellow-500 transition-all">
+              <CardHeader><CardTitle className="flex items-center"><LinkIcon className="w-6 h-6 mr-3 text-yellow-500" />Integrações</CardTitle></CardHeader>
+              <CardContent><CardDescription>Conecte e gerencie suas contas de marketplaces e outras ferramentas.</CardDescription></CardContent>
+            </Card>
+          </Link>
+
         </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
-        >
-          <Card className="border-0 shadow-sm bg-gradient-to-r from-blue-600 to-indigo-700 text-white">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold mb-2">
-                    Bem-vindo, {profile?.name || user?.email?.split('@')[0]}!
-                  </h2>
-                  <p className="text-blue-100">
-                    Seus negócios estão funcionando perfeitamente. Confira suas métricas abaixo.
-                  </p>
-                </div>
-                <div className="hidden md:block">
-                  <div className="bg-white/10 backdrop-blur-sm rounded-full p-4">
-                    <BarChart3 className="w-12 h-12 text-white" />
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Quick Actions */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="mb-8"
-        >
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Ações Rápidas</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {quickActions.map((action, index) => (
-              <Link key={index} to={action.href}>
-                <Card className="border-0 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer group">
-                  <CardContent className="p-6">
-                    <div className={`w-12 h-12 rounded-full bg-gradient-to-r ${action.color} flex items-center justify-center text-white mb-4 group-hover:scale-110 transition-transform duration-200`}>
-                      {action.icon}
-                    </div>
-                    <h4 className="font-semibold text-gray-900 mb-2">{action.title}</h4>
-                    <p className="text-sm text-gray-600">{action.description}</p>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* Dashboard Stats */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Suas Métricas</h3>
-          <DashboardStats />
-        </motion.div>
-
-        {/* Contact Support */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="mt-8"
-        >
-          <Card className="border-0 shadow-sm bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold text-green-900 mb-2">Precisa de Ajuda?</h3>
-                  <p className="text-green-700">
-                    Fale diretamente com nosso suporte técnico no WhatsApp. Lucas está pronto para te ajudar!
-                  </p>
-                </div>
-                <Button
-                  onClick={handleWhatsAppContact}
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                >
-                  <MessageCircle className="w-4 h-4 mr-2" />
-                  Falar no WhatsApp
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
+      </main>
     </div>
   );
 };

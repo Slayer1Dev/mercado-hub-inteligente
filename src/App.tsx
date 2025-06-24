@@ -12,6 +12,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import Billing from "./pages/Billing";
 import Integrations from "./pages/Integrations";
 import NotFound from "./pages/NotFound";
+import StockGroups from "./pages/StockGroups";
 import ProtectedRoute from "./components/ProtectedRoute";
 import "./App.css";
 
@@ -65,6 +66,7 @@ function App() {
             </ProtectedRoute>
           } />
           <Route path="*" element={<NotFound />} />
+          <Route path="/stock-groups" element={<ProtectedRoute><StockGroups /></ProtectedRoute>} />
         </Routes>
       </Router>
       <Toaster />
