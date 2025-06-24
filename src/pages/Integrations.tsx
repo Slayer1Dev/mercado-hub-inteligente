@@ -1,3 +1,4 @@
+// src/pages/Integrations.tsx
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
@@ -6,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client'; 
 import { 
   Link as LinkIcon, 
   CheckCircle, 
@@ -19,6 +20,7 @@ import {
   Eye
 } from 'lucide-react';
 import { toast } from 'sonner';
+import AppHeader from '@/components/AppHeader';
 
 interface Integration {
   id: string;
@@ -89,6 +91,7 @@ const Integrations = () => {
   const connectMercadoLivre = async () => {
     setConnecting('mercado_livre');
     try {
+      // CORREÇÃO: Adicionando o header de autorização novamente
       const { data, error } = await supabase.functions.invoke('mercado-livre-integration/oauth-start', {
         headers: {
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
@@ -112,6 +115,7 @@ const Integrations = () => {
   const testGeminiConnection = async () => {
     setConnecting('gemini');
     try {
+       // CORREÇÃO: Adicionando o header de autorização novamente
       const { data, error } = await supabase.functions.invoke('gemini-ai/test', {
         headers: {
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
@@ -122,7 +126,6 @@ const Integrations = () => {
 
       if (data?.connected) {
         toast.success('Conexão com Gemini AI funcionando!');
-        // Atualizar estado da integração
         await supabase
           .from('user_integrations')
           .upsert({
@@ -130,7 +133,7 @@ const Integrations = () => {
             integration_type: 'gemini',
             is_connected: true,
             last_sync: new Date().toISOString(),
-          });
+          }, { onConflict: 'user_id, integration_type' });
         loadIntegrations();
       } else {
         toast.error(data?.error || 'Falha na conexão com Gemini AI');
@@ -146,6 +149,7 @@ const Integrations = () => {
   const syncQuestions = async () => {
     setConnecting('sync');
     try {
+      // CORREÇÃO: Adicionando o header de autorização novamente
       const { data, error } = await supabase.functions.invoke('mercado-livre-integration/sync-questions', {
         headers: {
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
@@ -154,11 +158,11 @@ const Integrations = () => {
 
       if (error) throw error;
 
-      toast.success('Sincronização iniciada com sucesso!');
+      toast.success(data.message || 'Sincronização iniciada com sucesso!');
       loadLogs();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro na sincronização:', error);
-      toast.error('Erro na sincronização de perguntas');
+      toast.error('Erro na sincronização de perguntas', { description: error.message });
     } finally {
       setConnecting(null);
     }
@@ -183,14 +187,18 @@ const Integrations = () => {
     );
   };
 
-  const getLogStatusColor = (status: string) => {
+  const getLogStatusClasses = (status: string) => {
     switch (status) {
-      case 'success': return 'text-green-600';
-      case 'error': return 'text-red-600';
-      case 'warning': return 'text-yellow-600';
-      default: return 'text-blue-600';
+    case 'success':
+        return { dot: 'bg-green-500', text: 'text-green-600' };
+    case 'error':
+        return { dot: 'bg-red-500', text: 'text-red-600' };
+    case 'warning':
+        return { dot: 'bg-yellow-500', text: 'text-yellow-600' };
+    default:
+        return { dot: 'bg-blue-500', text: 'text-blue-600' };
     }
-  };
+};
 
   if (loading) {
     return (
@@ -201,9 +209,9 @@ const Integrations = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-4">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
+    <div className="flex flex-col min-h-screen bg-gray-50">
+      <AppHeader />
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -215,9 +223,7 @@ const Integrations = () => {
           </p>
         </motion.div>
 
-        {/* Status Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          {/* Mercado Livre */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -277,7 +283,6 @@ const Integrations = () => {
             </Card>
           </motion.div>
 
-          {/* Gemini AI */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -321,7 +326,6 @@ const Integrations = () => {
           </motion.div>
         </div>
 
-        {/* Instructions Alert */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -337,7 +341,6 @@ const Integrations = () => {
           </Alert>
         </motion.div>
 
-        {/* Logs Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -358,42 +361,58 @@ const Integrations = () => {
               </div>
             </CardHeader>
             {showLogs && (
-              <CardContent>
-                {logs.length > 0 ? (
-                  <div className="space-y-2 max-h-96 overflow-y-auto">
-                    {logs.map((log) => (
-                      <div
-                        key={log.id}
-                        className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg text-sm"
-                      >
-                        <div className="flex-shrink-0">
-                          <div className={`w-2 h-2 rounded-full ${
-                            log.status === 'success' ? 'bg-green-500' :
-                            log.status === 'error' ? 'bg-red-500' :
-                            log.status === 'warning' ? 'bg-yellow-500' :
-                            'bg-blue-500'
-                          }`} />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-2 mb-1">
-                            <Badge variant="outline" className="text-xs">
-                              {log.integration_type}
-                            </Badge>
-                            <span className="text-xs text-gray-500">
-                              {log.action}
-                            </span>
-                            <span className="text-xs text-gray-400">
-                              {new Date(log.created_at).toLocaleString()}
-                            </span>
-                          </div>
-                          <div className={`${getLogStatusColor(log.status)} font-medium`}>
-                            {log.message}
-                          </div>
-                          {log.details && (
-                            <div className="mt-1 text-xs text-gray-500 font-mono">
-                              {JSON.stringify(log.details, null, 2)}
-                            </div>
-                          )}
+    <CardContent>
+    {logs.length > 0 ? (
+        <div className="space-y-2 max-h-96 overflow-y-auto">
+        {logs.map((log) => {
+            // Chamamos a nossa nova função aqui
+            const statusClasses = getLogStatusClasses(log.status);
+
+            return (
+            <div
+                key={log.id}
+                className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg text-sm"
+            >
+                <div className="flex-shrink-0">
+                {/* Usamos a classe do ponto aqui */}
+                <div className={`mt-1 w-2 h-2 rounded-full ${statusClasses.dot}`} />
+                </div>
+                <div className="flex-1">
+                <div className="flex items-center space-x-2 mb-1">
+                    <Badge variant="outline" className="text-xs">
+                    {log.integration_type}
+                    </Badge>
+                    <span className="text-xs text-gray-500">
+                    {log.action}
+                    </span>
+                    <span className="text-xs text-gray-400">
+                    {new Date(log.created_at).toLocaleString()}
+                    </span>
+                </div>
+                {/* Usamos a classe do texto aqui */}
+                <div className={`${statusClasses.text} font-medium`}>
+                    {log.message}
+                </div>
+                {log.details && (
+                    <details className="mt-1 text-xs">
+                    <summary className="cursor-pointer text-gray-500">Detalhes</summary>
+                    <pre className="mt-1 p-2 bg-white border rounded-md font-mono text-gray-600 whitespace-pre-wrap break-all">
+                        {JSON.stringify(log.details, null, 2)}
+                    </pre>
+                    </details>
+                )}
+                </div>
+            </div>
+            );
+        })}
+        </div>
+    ) : (
+        <div className="text-center py-8 text-gray-500">
+        Nenhum log encontrado
+        </div>
+    )}
+    </CardContent>
+)}
                         </div>
                       </div>
                     ))}
@@ -407,7 +426,7 @@ const Integrations = () => {
             )}
           </Card>
         </motion.div>
-      </div>
+      </main>
     </div>
   );
 };
