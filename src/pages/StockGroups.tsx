@@ -23,7 +23,6 @@ import { Label } from "@/components/ui/label";
 interface StockGroup {
   id: string;
   group_name: string;
-  // Futuramente adicionaremos os produtos aqui
 }
 
 const StockGroups = () => {
@@ -42,7 +41,7 @@ const StockGroups = () => {
         .from('stock_groups')
         .select('*')
         .eq('user_id', user.id);
-
+      
       if (error) throw error;
       setGroups(data || []);
     } catch (error: any) {
@@ -63,15 +62,19 @@ const StockGroups = () => {
     }
     setSaving(true);
     try {
-      const { data, error }_ = await supabase
+      // CORREÇÃO APLICADA AQUI: removido o '_' extra
+      const { data, error } = await supabase
         .from('stock_groups')
         .insert({ group_name: newGroupName, user_id: user?.id })
-        .select();
+        .select()
+        .single(); // Adicionado .single() para pegar apenas um objeto
 
       if (error) throw error;
 
       toast.success(`Grupo "${newGroupName}" criado com sucesso!`);
-      setGroups([...groups, data[0]]);
+      if(data) {
+        setGroups([...groups, data]);
+      }
       setNewGroupName("");
       setIsDialogOpen(false);
     } catch (error: any) {
