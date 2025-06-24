@@ -14,7 +14,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Pagination,
   PaginationContent,
-  PaginationEllipsis,
   PaginationItem,
   PaginationLink,
   PaginationNext,
@@ -48,7 +47,7 @@ interface StockGroup {
   group_name: string;
 }
 
-const ITEMS_PER_PAGE = 10; // Define quantos produtos mostrar por página
+const ITEMS_PER_PAGE = 10;
 
 const StockManagement = () => {
   const { user } = useAuth();
@@ -62,7 +61,6 @@ const StockManagement = () => {
   const [newGroupName, setNewGroupName] = useState("");
   const [savingGroup, setSavingGroup] = useState(false);
 
-  // --- NOVOS STATES PARA PAGINAÇÃO ---
   const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
@@ -87,7 +85,17 @@ const StockManagement = () => {
   };
   
   const fetchGroups = async () => {
-    // ... (código existente, sem alterações)
+    if (!user) return;
+    setLoadingGroups(true);
+    try {
+      const { data, error } = await supabase.from('stock_groups').select('*').eq('user_id', user.id).order('created_at', { ascending: true });
+      if (error) throw error;
+      setGroups(data || []);
+    } catch (error: any) {
+      toast.error("Erro ao buscar grupos de estoque.", { description: error.message });
+    } finally {
+      setLoadingGroups(false);
+    }
   };
 
   const handleSyncProducts = async () => {
@@ -99,7 +107,7 @@ const StockManagement = () => {
       const { data, error } = await supabase.functions.invoke('mercado-livre-integration/sync-products');
       if (error) throw error;
       toast.success(data.message || "Sincronização concluída!");
-      await fetchProducts(); 
+      await fetchProducts();
     } catch(error: any) {
       toast.error("Falha na sincronização", { description: error.message });
     } finally {
@@ -108,10 +116,29 @@ const StockManagement = () => {
   };
 
   const handleCreateGroup = async () => {
-    // ... (código existente, sem alterações)
+    if (!newGroupName.trim()) {
+      toast.warning("O nome do grupo não pode ser vazio.");
+      return;
+    }
+    setSavingGroup(true);
+    try {
+      const { data, error } = await supabase
+        .from('stock_groups')
+        .insert({ group_name: newGroupName, user_id: user?.id })
+        .select()
+        .single();
+      if (error) throw error;
+      toast.success(`Grupo "${newGroupName}" criado com sucesso!`);
+      if(data) setGroups([...groups, data]);
+      setNewGroupName("");
+      setIsGroupDialogOpen(false);
+    } catch (error: any) {
+      toast.error("Falha ao criar grupo.", { description: error.message });
+    } finally {
+      setSavingGroup(false);
+    }
   };
 
-  // --- LÓGICA PARA CALCULAR OS PRODUTOS DA PÁGINA ATUAL ---
   const paginatedProducts = useMemo(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const endIndex = startIndex + ITEMS_PER_PAGE;
@@ -124,20 +151,46 @@ const StockManagement = () => {
     <div className="flex flex-col min-h-screen bg-gray-50">
       <AppHeader />
       <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* ... (código do header da página, sem alterações) ... */}
+        <div className="flex justify-between items-center mb-8">
+            <div>
+                <h1 className="text-3xl font-bold text-gray-900">Gerenciador de Estoque</h1>
+                <p className="text-gray-600">Visualize, gerencie e agrupe o estoque de seus produtos.</p>
+            </div>
+        </div>
 
         <Tabs defaultValue="products" className="w-full">
-          {/* ... (código do TabsList, sem alterações) ... */}
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="products">Todos os Produtos</TabsTrigger>
+            <TabsTrigger value="groups">Grupos de Estoque</TabsTrigger>
+          </TabsList>
 
           <TabsContent value="products">
             <Card>
+              {/* === BOTÃO RESTAURADO AQUI === */}
               <CardHeader>
-                 {/* ... (código do CardHeader, sem alterações) ... */}
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle>Seus Produtos</CardTitle>
+                    <CardDescription>Lista de todos os seus produtos sincronizados do Mercado Livre.</CardDescription>
+                  </div>
+                  <Button onClick={handleSyncProducts} disabled={syncing}>
+                    {syncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2"/>}
+                    Sincronizar Produtos
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="border rounded-lg">
                   <Table>
-                    {/* ... (código do TableHeader, sem alterações) ... */}
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[80px]">Imagem</TableHead>
+                        <TableHead>Título</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Preço</TableHead>
+                        <TableHead className="text-right">Estoque</TableHead>
+                      </TableRow>
+                    </TableHeader>
                     <TableBody>
                       {loadingProducts ? (
                         <TableRow><TableCell colSpan={5} className="text-center h-24">Carregando produtos...</TableCell></TableRow>
@@ -157,23 +210,19 @@ const StockManagement = () => {
                     </TableBody>
                   </Table>
                 </div>
-                {/* --- CONTROLES DE PAGINAÇÃO ADICIONADOS --- */}
                 {pageCount > 1 && (
                   <div className="mt-6 flex justify-center">
                     <Pagination>
                       <PaginationContent>
                         <PaginationItem>
-                          <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); setCurrentPage(p => Math.max(1, p - 1)); }} disabled={currentPage === 1} />
+                          <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); setCurrentPage(p => Math.max(1, p - 1)); }} />
                         </PaginationItem>
-                        {[...Array(pageCount).keys()].map(page => (
-                          <PaginationItem key={page}>
-                            <PaginationLink href="#" onClick={(e) => { e.preventDefault(); setCurrentPage(page + 1); }} isActive={currentPage === page + 1}>
-                              {page + 1}
-                            </PaginationLink>
-                          </PaginationItem>
-                        ))}
+                        {/* Simplificando a renderização da paginação para evitar sobrecarga */}
                         <PaginationItem>
-                          <PaginationNext href="#" onClick={(e) => { e.preventDefault(); setCurrentPage(p => Math.min(pageCount, p + 1)); }} disabled={currentPage === pageCount}/>
+                          <span className="px-4 py-2 text-sm">Página {currentPage} de {pageCount}</span>
+                        </PaginationItem>
+                        <PaginationItem>
+                          <PaginationNext href="#" onClick={(e) => { e.preventDefault(); setCurrentPage(p => Math.min(pageCount, p + 1)); }} />
                         </PaginationItem>
                       </PaginationContent>
                     </Pagination>
@@ -182,9 +231,49 @@ const StockManagement = () => {
               </CardContent>
             </Card>
           </TabsContent>
-          
+
           <TabsContent value="groups">
-            {/* ... (código da aba de grupos, sem alterações) ... */}
+            <Card>
+              <CardHeader>
+                 <div className="flex justify-between items-center">
+                    <div>
+                      <CardTitle>Seus Grupos de Estoque</CardTitle>
+                      <CardDescription>Agrupe anúncios para sincronizar o estoque automaticamente.</CardDescription>
+                    </div>
+                     <Dialog open={isGroupDialogOpen} onOpenChange={setIsGroupDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline"><PlusCircle className="w-4 h-4 mr-2" />Criar Novo Grupo</Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                          <DialogTitle>Criar Novo Grupo de Estoque</DialogTitle>
+                          <DialogDescription>Dê um nome para seu grupo. Ex: "Projetor Hy320".</DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4"><div className="grid grid-cols-4 items-center gap-4"><Label htmlFor="name" className="text-right">Nome</Label><Input id="name" value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} className="col-span-3" placeholder="Nome do grupo"/></div></div>
+                        <DialogFooter><Button onClick={handleCreateGroup} disabled={savingGroup}>{savingGroup ? <Loader2 className="w-4 h-4 mr-2 animate-spin"/> : null}Salvar</Button></DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+              </CardHeader>
+              <CardContent>
+                {loadingGroups ? <p>Carregando grupos...</p> : groups.length === 0 ? (
+                  <div className="text-center py-16 text-gray-500 border-2 border-dashed rounded-lg">
+                      <Boxes className="w-12 h-12 mx-auto mb-4 text-gray-300"/>
+                      <h3 className="font-semibold text-lg">Nenhum grupo encontrado</h3>
+                      <p className="text-sm mt-2">Clique em "Criar Novo Grupo" para começar.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {groups.map(group => (
+                      <Card key={group.id}>
+                        <CardHeader><CardTitle className="flex items-center"><Package className="w-5 h-5 mr-2 text-purple-600"/>{group.group_name}</CardTitle><CardDescription>0 produtos neste grupo</CardDescription></CardHeader>
+                        <CardContent><Button variant="outline" className="w-full" disabled>Adicionar Produto (em breve)</Button></CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </main>
