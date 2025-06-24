@@ -115,18 +115,13 @@ const AdminDashboard = () => {
 
   const loadUsers = async () => {
     try {
-      const { data: profiles, error } = await supabase
-        .from('profiles')
-        .select(`
-          *,
-          user_subscriptions (plan_type, plan_status, expires_at),
-          user_integrations (integration_type, is_connected, last_sync)
-        `)
-        .order('created_at', { ascending: false });
-
+      // Chama a função RPC que acabamos de criar no Supabase
+      const { data, error } = await supabase.rpc('get_admin_users_data');
+  
       if (error) throw error;
-
-      const formattedUsers: UserData[] = profiles?.map(profile => ({
+  
+      // Os dados agora vêm no formato correto, prontos para uso
+      const formattedUsers: UserData[] = data?.map(profile => ({
         id: profile.id,
         email: profile.email,
         name: profile.name,
@@ -134,14 +129,10 @@ const AdminDashboard = () => {
         last_login: profile.last_login,
         is_online: profile.is_online,
         notes: profile.notes,
-        subscription: Array.isArray(profile.user_subscriptions) 
-          ? profile.user_subscriptions[0] || null 
-          : profile.user_subscriptions || null,
-        integrations: Array.isArray(profile.user_integrations) 
-          ? profile.user_integrations 
-          : []
+        subscription: profile.subscription, // O objeto subscription já vem pronto
+        integrations: profile.integrations || [] // O array de integrations já vem pronto
       })) || [];
-
+  
       setUsers(formattedUsers);
     } catch (error) {
       console.error('Error loading users:', error);
