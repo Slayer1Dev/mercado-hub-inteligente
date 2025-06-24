@@ -135,8 +135,7 @@ async function handleSyncProducts(req: Request, supabase: any, user: any) {
 
     for (let i = 0; i < allItemIds.length; i += batchSize) {
       const batchIds = allItemIds.slice(i, i + batchSize);
-      const detailsResponse = await fetch(`https://api.mercadolibre.com/items?ids=${batchIds.join(',')}&attributes=id,title,price,available_quantity,status,permalink,thumbnail`, {
-        headers: { 'Authorization': `Bearer ${accessToken}` }
+      const detailsResponse = await fetch(`https://api.mercadolibre.com/items?ids=${batchIds.join(',')}&attributes=id,title,price,available_quantity,status,permalink,thumbnail,attributes`, {        headers: { 'Authorization': `Bearer ${accessToken}` }
       });
       if (!detailsResponse.ok) {
         await createLog(supabase, user.id, 'sync_products', 'warning', `Falha ao buscar detalhes de um lote de itens.`, { batchIds });
@@ -147,17 +146,21 @@ async function handleSyncProducts(req: Request, supabase: any, user: any) {
       allProductsDetails.push(...detailsData.filter((item: any) => item.code === 200).map((item: any) => item.body));
     }
     
-    const productsToUpsert = allProductsDetails.map((item: any) => ({
-      user_id: user.id,
-      ml_item_id: item.id,
-      title: item.title,
-      price: item.price,
-      stock_quantity: item.available_quantity,
-      status: item.status,
-      permalink: item.permalink,
-      thumbnail: item.thumbnail,
-      last_synced_at: new Date().toISOString(),
-    }));
+    const productsToUpsert = allProductsDetails.map((item: any) => {
+      const eanAttribute = item.body.attributes.find((attr: any) => attr.id === 'EAN');
+      return {
+          user_id: user.id,
+          ml_item_id: item.body.id,
+          title: item.body.title,
+          price: item.body.price,
+          stock_quantity: item.body.available_quantity,
+          status: item.body.status,
+          permalink: item.body.permalink,
+          thumbnail: item.body.thumbnail,
+          ean: eanAttribute ? eanAttribute.value_name : null, // Salva o EAN
+          last_synced_at: new Date().toISOString(),
+      };
+  });
     
     if (productsToUpsert.length > 0) {
         const { error: upsertError } = await supabase.from('products').upsert(productsToUpsert, { onConflict: 'user_id, ml_item_id' });

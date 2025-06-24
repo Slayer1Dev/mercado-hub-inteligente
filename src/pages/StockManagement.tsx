@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Package, Boxes, Loader2, RefreshCw, Search, Save, X } from "lucide-react";
+import { PlusCircle, Package, Boxes, Loader2, RefreshCw, Search, MoreHorizontal, ArrowLeft, Trash2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -31,7 +31,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface Product {
@@ -43,6 +43,7 @@ interface Product {
   status: string;
   permalink: string;
   thumbnail: string;
+  ean: string | null;
 }
 
 // Atualizada para receber a contagem de produtos
@@ -50,6 +51,10 @@ interface StockGroup {
   id: string;
   group_name: string;
   stock_group_products: { count: number }[];
+}
+
+interface StockGroupDetail extends StockGroup {
+  products: Product[];
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -62,18 +67,17 @@ const StockManagement = () => {
   
   const [groups, setGroups] = useState<StockGroup[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(true);
-  const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);
-  const [newGroupName, setNewGroupName] = useState("");
-  const [savingGroup, setSavingGroup] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
 
   // --- NOVOS STATES PARA PESQUISA E ORDENAÇÃO ---
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOrder, setSortOrder] = useState("title-asc");
-
-  // --- State para o Modal de Adicionar Produtos ---
-  const [selectedGroupForEditing, setSelectedGroupForEditing] = useState<StockGroup | null>(null);
+  
+  // State para controlar a visão de detalhes do grupo e modais
+  const [viewingGroup, setViewingGroup] = useState<StockGroupDetail | null>(null);
+  const [productToManage, setProductToManage] = useState<Product | null>(null);
+  const [loadingGroupDetails, setLoadingGroupDetails] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -101,13 +105,10 @@ const StockManagement = () => {
     if (!user) return;
     setLoadingGroups(true);
     try {
-      // A consulta agora é feita de forma explícita, o que resolve o erro.
+      // Revertendo para a consulta implícita que estava funcionando corretamente.
       const { data, error } = await supabase
         .from('stock_groups')
-        .select(`
-          *,
-          stock_group_products!group_id(count)
-        `)
+        .select('*, stock_group_products(count)')
         .eq('user_id', user.id)
         .order('created_at', { ascending: true });
         
@@ -140,28 +141,41 @@ const StockManagement = () => {
     }
   };
 
-  const handleCreateGroup = async () => {
-    if (!newGroupName.trim()) {
+  const handleCreateGroup = async (name: string): Promise<StockGroup | null> => {
+    if (!name.trim()) {
       toast.warning("O nome do grupo não pode ser vazio.");
-      return;
+      return null;
     }
-    setSavingGroup(true);
     try {
       const { data, error } = await supabase
         .from('stock_groups')
-        .insert({ group_name: newGroupName, user_id: user?.id })
+        .insert({ group_name: name, user_id: user?.id })
         .select()
         .single();
       if (error) throw error;
-      toast.success(`Grupo "${newGroupName}" criado com sucesso!`);
-      if(data) setGroups([...groups, data]);
-      setNewGroupName("");
-      setIsGroupDialogOpen(false);
+      toast.success(`Grupo "${name}" criado com sucesso!`);
+      fetchGroups(); // Re-fetch all groups to update the list
+      return data;
     } catch (error: any) {
       toast.error("Falha ao criar grupo.", { description: error.message });
-    } finally {
-      setSavingGroup(false);
+      return null;
     }
+  };
+
+  const handleViewGroup = async (group: StockGroup) => {
+    setLoadingGroupDetails(true);
+    const { data, error } = await supabase
+      .from('stock_groups')
+      .select('*, products(*)')
+      .eq('id', group.id)
+      .single();
+
+    if(error) {
+      toast.error("Erro ao carregar detalhes do grupo.");
+    } else if (data) {
+      setViewingGroup(data);
+    }
+    setLoadingGroupDetails(false);
   };
 
   // --- LÓGICA DE FILTRO E ORDENAÇÃO ---
@@ -194,6 +208,17 @@ const StockManagement = () => {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, sortOrder]);
+
+  // Se estiver vendo um grupo, mostra a tela de detalhes
+  if (viewingGroup) {
+    return (
+        <GroupDetailView 
+            group={viewingGroup}
+            onBack={() => { setViewingGroup(null); fetchGroups(); }}
+            onGroupUpdate={() => handleViewGroup(viewingGroup)}
+        />
+    )
+  }
 
 
   return (
@@ -262,6 +287,7 @@ const StockManagement = () => {
                         <TableHead className="text-right">Preço</TableHead>
                         <TableHead className="text-right">Estoque</TableHead>
                       </TableRow>
+                      <TableHead className="w-[50px]">Ações</TableHead>
                     </TableHeader>
                     <TableBody>
                       {loadingProducts ? (
@@ -273,11 +299,19 @@ const StockManagement = () => {
                             <TableCell className="font-medium max-w-sm truncate" title={product.title}>{product.title}</TableCell>
                             <TableCell><Badge variant={product.status === 'active' ? 'default' : 'secondary'}>{product.status}</Badge></TableCell>
                             <TableCell className="text-right">R$ {product.price?.toFixed(2)}</TableCell>
-                            <TableCell className="text-right">{product.stock_quantity}</TableCell>
+                            <TableCell className="text-right font-semibold">{product.stock_quantity}</TableCell>
+                            <TableCell>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                <DropdownMenuContent>
+                                  <DropdownMenuItem onClick={() => setProductToManage(product)}>Adicionar ao Grupo</DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
                           </TableRow>
                         ))
                       ) : (
-                         <TableRow><TableCell colSpan={5} className="text-center h-24 text-gray-500">Nenhum produto encontrado. Clique em "Sincronizar Produtos" ou ajuste sua busca.</TableCell></TableRow>
+                         <TableRow><TableCell colSpan={6} className="text-center h-24 text-gray-500">Nenhum produto encontrado. Clique em "Sincronizar Produtos" ou ajuste sua busca.</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
@@ -289,7 +323,6 @@ const StockManagement = () => {
                         <PaginationItem>
                           <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); setCurrentPage(p => Math.max(1, p - 1)); }} />
                         </PaginationItem>
-                        {/* Simplificando a renderização da paginação para evitar sobrecarga */}
                         <PaginationItem>
                           <span className="px-4 py-2 text-sm">Página {currentPage} de {pageCount}</span>
                         </PaginationItem>
@@ -312,19 +345,6 @@ const StockManagement = () => {
                       <CardTitle>Seus Grupos de Estoque</CardTitle>
                       <CardDescription>Agrupe anúncios para sincronizar o estoque automaticamente.</CardDescription>
                     </div>
-                     <Dialog open={isGroupDialogOpen} onOpenChange={setIsGroupDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button variant="outline"><PlusCircle className="w-4 h-4 mr-2" />Criar Novo Grupo</Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-[425px]">
-                        <DialogHeader>
-                          <DialogTitle>Criar Novo Grupo de Estoque</DialogTitle>
-                          <DialogDescription>Dê um nome para seu grupo. Ex: "Projetor Hy320".</DialogDescription>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4"><div className="grid grid-cols-4 items-center gap-4"><Label htmlFor="name" className="text-right">Nome</Label><Input id="name" value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} className="col-span-3" placeholder="Nome do grupo"/></div></div>
-                        <DialogFooter><Button onClick={handleCreateGroup} disabled={savingGroup}>{savingGroup ? <Loader2 className="w-4 h-4 mr-2 animate-spin"/> : null}Salvar</Button></DialogFooter>
-                      </DialogContent>
-                    </Dialog>
                   </div>
               </CardHeader>
               <CardContent>
@@ -337,14 +357,14 @@ const StockManagement = () => {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {groups.map(group => (
-                      <Card key={group.id} className="flex flex-col">
+                      <Card key={group.id} className="flex flex-col hover:shadow-lg transition-shadow cursor-pointer" onClick={() => handleViewGroup(group)}>
                         <CardHeader>
                             <CardTitle className="flex items-center"><Package className="w-5 h-5 mr-2 text-purple-600"/>{group.group_name}</CardTitle>
                             {/* ATUALIZADO: Exibe a contagem correta de produtos */}
                             <CardDescription>{group.stock_group_products[0]?.count || 0} produtos neste grupo</CardDescription>
                         </CardHeader>
-                        <CardContent className="mt-auto">
-                            <Button variant="outline" className="w-full" onClick={() => setSelectedGroupForEditing(group)}>Adicionar/Editar Produtos</Button>
+                        <CardContent className="mt-auto text-center">
+                            <p className="text-sm text-blue-600 font-semibold">Ver Detalhes</p>
                         </CardContent>
                       </Card>
                     ))}
@@ -356,140 +376,163 @@ const StockManagement = () => {
         </Tabs>
       </main>
 
-      {/* --- NOVO MODAL PARA ADICIONAR PRODUTOS AO GRUPO --- */}
-      {selectedGroupForEditing && (
-        <AddProductsToGroupDialog
-          group={selectedGroupForEditing}
-          allProducts={products}
-          onOpenChange={() => setSelectedGroupForEditing(null)}
-          onSave={() => {
-            fetchGroups(); // Atualiza a contagem de grupos
-            setSelectedGroupForEditing(null);
-          }}
+      {productToManage && (
+        <AddToGroupModal 
+            product={productToManage}
+            groups={groups}
+            onCreateGroup={handleCreateGroup}
+            onClose={() => setProductToManage(null)}
         />
       )}
     </div>
   );
 };
 
+// --- NOVOS COMPONENTES PARA A NOVA INTERFACE ---
 
-// --- NOVO COMPONENTE DE DIÁLOGO ---
-interface AddProductsDialogProps {
-  group: StockGroup;
-  allProducts: Product[];
-  onOpenChange: () => void;
-  onSave: () => void;
-}
-
-function AddProductsToGroupDialog({ group, allProducts, onOpenChange, onSave }: AddProductsDialogProps) {
-  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-
-  useEffect(() => {
-    // Carrega os produtos que já estão no grupo
-    const fetchExistingProducts = async () => {
-      setIsLoading(true);
-      const { data, error } = await supabase
-        .from('stock_group_products')
-        .select('product_id')
-        .eq('group_id', group.id);
-      
-      if (error) {
-        toast.error("Erro ao carregar produtos do grupo.");
-      } else {
-        const ids = new Set(data.map(item => item.product_id));
-        setSelectedProductIds(ids);
-      }
-      setIsLoading(false);
+// Componente para a tela de detalhes de um grupo
+const GroupDetailView = ({ group, onBack, onGroupUpdate }: { group: StockGroupDetail; onBack: () => void; onGroupUpdate: () => void }) => {
+    const handleRemoveProduct = async (productId: string) => {
+        const { error } = await supabase.from('stock_group_products').delete().match({ group_id: group.id, product_id: productId });
+        if (error) {
+            toast.error("Falha ao remover produto.");
+        } else {
+            toast.success("Produto removido do grupo.");
+            onGroupUpdate(); // Atualiza a visão
+        }
     };
-    fetchExistingProducts();
-  }, [group]);
-
-  const handleCheckboxChange = (productId: string, checked: boolean) => {
-    const newSet = new Set(selectedProductIds);
-    if (checked) {
-      newSet.add(productId);
-    } else {
-      newSet.delete(productId);
-    }
-    setSelectedProductIds(newSet);
-  };
-
-  const handleSaveChanges = async () => {
-    setIsSaving(true);
     
-    // 1. Deleta todas as associações existentes para este grupo
-    const { error: deleteError } = await supabase
-        .from('stock_group_products')
-        .delete()
-        .eq('group_id', group.id);
+    return (
+        <div className="flex flex-col min-h-screen bg-gray-50">
+            <AppHeader />
+            <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <Button variant="ghost" onClick={onBack} className="mb-4"><ArrowLeft className="mr-2 h-4 w-4" /> Voltar para todos os grupos</Button>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-2xl">{group.group_name}</CardTitle>
+                        <CardDescription>{group.products.length} produtos neste grupo.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="w-[80px]">Imagem</TableHead>
+                                <TableHead>Título</TableHead>
+                                <TableHead className="text-right">Estoque</TableHead>
+                                <TableHead className="text-right">Ações</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {group.products.map((product: Product) => (
+                                    <TableRow key={product.id}>
+                                        <TableCell><img src={product.thumbnail} alt={product.title} className="w-12 h-12 object-cover rounded-md" /></TableCell>
+                                        <TableCell>
+                                            <p className="font-medium">{product.title}</p>
+                                            <p className="text-xs text-gray-500">EAN: {product.ean || 'N/A'}</p>
+                                        </TableCell>
+                                        <TableCell className="text-right font-semibold">{product.stock_quantity}</TableCell>
+                                        <TableCell className="text-right">
+                                            <Button variant="destructive" size="sm" onClick={() => handleRemoveProduct(product.id)}><Trash2 className="h-4 w-4 mr-2" /> Remover</Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+            </main>
+        </div>
+    );
+};
 
-    if (deleteError) {
-        toast.error("Erro ao atualizar o grupo.", { description: deleteError.message });
-        setIsSaving(false);
-        return;
-    }
-    
-    // 2. Insere as novas associações selecionadas
-    if (selectedProductIds.size > 0) {
-        const newLinks = Array.from(selectedProductIds).map(productId => ({
-            group_id: group.id,
-            product_id: productId,
-        }));
+// Componente para o modal de adicionar a um grupo
+const AddToGroupModal = ({ product, groups, onClose, onCreateGroup }: { product: Product, groups: StockGroup[], onClose: () => void, onCreateGroup: (name: string) => Promise<StockGroup | null> }) => {
+    const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+    const [isCreatingNew, setIsCreatingNew] = useState(false);
+    const [newGroupName, setNewGroupName] = useState("");
+    const [isSaving, setIsSaving] = useState(false);
 
-        const { error: insertError } = await supabase
-            .from('stock_group_products')
-            .insert(newLinks);
+    const handleSave = async () => {
+        setIsSaving(true);
+        let groupId = selectedGroupId;
 
-        if (insertError) {
-            toast.error("Erro ao salvar produtos no grupo.", { description: insertError.message });
+        if (isCreatingNew) {
+            if(!newGroupName) {
+                toast.error("O nome do novo grupo é obrigatório.");
+                setIsSaving(false);
+                return;
+            }
+            const newGroup = await onCreateGroup(newGroupName);
+            if (newGroup) {
+              groupId = newGroup.id;
+            } else {
+              setIsSaving(false);
+              return; // Error handled in onCreateGroup
+            }
+        }
+
+        if (!groupId) {
+            toast.error("Por favor, selecione um grupo.");
             setIsSaving(false);
             return;
         }
-    }
-    
-    toast.success(`Grupo "${group.group_name}" atualizado com sucesso!`);
-    setIsSaving(false);
-    onSave();
-  };
 
-  return (
-    <Dialog open={true} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Adicionar Produtos ao Grupo: {group.group_name}</DialogTitle>
-          <DialogDescription>Selecione os anúncios que compartilham o mesmo estoque físico deste grupo.</DialogDescription>
-        </DialogHeader>
-        {isLoading ? (
-          <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>
-        ) : (
-          <ScrollArea className="h-96 border rounded-md p-4">
-            <div className="space-y-4">
-              {allProducts.map(product => (
-                <div key={product.id} className="flex items-center space-x-3">
-                  <Checkbox
-                    id={`product-${product.id}`}
-                    checked={selectedProductIds.has(product.id)}
-                    onCheckedChange={(checked) => handleCheckboxChange(product.id, !!checked)}
-                  />
-                  <img src={product.thumbnail} alt={product.title} className="w-10 h-10 rounded-md object-cover" />
-                  <Label htmlFor={`product-${product.id}`} className="flex-1 cursor-pointer">{product.title}</Label>
+        const { error } = await supabase.from('stock_group_products').insert({
+            group_id: groupId,
+            product_id: product.id,
+        });
+
+        if (error) {
+            toast.error("Erro ao adicionar produto ao grupo.", { description: "Este produto talvez já esteja no grupo."});
+        } else {
+            toast.success(`"${product.title}" adicionado ao grupo!`);
+            onClose();
+        }
+        setIsSaving(false);
+    };
+
+    return (
+        <Dialog open={true} onOpenChange={onClose}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Adicionar ao Grupo</DialogTitle>
+                    <div className="flex items-center space-x-4 pt-4">
+                        <img src={product.thumbnail} className="w-16 h-16 rounded-lg border" alt={product.title} />
+                        <div>
+                            <p className="font-medium">{product.title}</p>
+                            <p className="text-sm text-gray-500">Estoque: {product.stock_quantity} | EAN: {product.ean || 'N/A'}</p>
+                        </div>
+                    </div>
+                </DialogHeader>
+                <div className="py-4 space-y-4">
+                    <Label>Selecione um grupo existente</Label>
+                    <Select onValueChange={setSelectedGroupId} disabled={isCreatingNew}>
+                        <SelectTrigger><SelectValue placeholder="Escolha um grupo..." /></SelectTrigger>
+                        <SelectContent>
+                            {groups.map(g => <SelectItem key={g.id} value={g.id}>{g.group_name}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                    
+                    <div className="flex items-center space-x-2"><div className="flex-1 border-t"></div><span className="text-xs text-gray-500">OU</span><div className="flex-1 border-t"></div></div>
+
+                    <div className="space-y-2">
+                        <Button variant="outline" className="w-full" onClick={() => setIsCreatingNew(!isCreatingNew)}>
+                            <PlusCircle className="mr-2 h-4 w-4" /> {isCreatingNew ? 'Cancelar Criação' : 'Criar Novo Grupo'}
+                        </Button>
+                        {isCreatingNew && (
+                            <Input placeholder="Nome do novo grupo..." value={newGroupName} onChange={e => setNewGroupName(e.target.value)} />
+                        )}
+                    </div>
                 </div>
-              ))}
-            </div>
-          </ScrollArea>
-        )}
-        <DialogFooter>
-          <Button variant="outline" onClick={onOpenChange}>Cancelar</Button>
-          <Button onClick={handleSaveChanges} disabled={isSaving}>
-            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Salvar Alterações
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+                <DialogFooter>
+                    <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+                    <Button onClick={handleSave} disabled={isSaving}>
+                         {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Salvar
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
 }
 
 export default StockManagement;
