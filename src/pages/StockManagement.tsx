@@ -50,10 +50,10 @@ interface Product {
 interface StockGroup {
   id: string;
   group_name: string;
-  stock_group_products: { count: number }[];
+  product_count: number;
 }
 
-interface StockGroupDetail extends StockGroup {
+interface GroupDetail extends StockGroup {
   products: Product[];
 }
 
@@ -64,7 +64,7 @@ const StockManagement = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [syncing, setSyncing] = useState(false);
-  
+
   const [groups, setGroups] = useState<StockGroup[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(true);
 
@@ -73,9 +73,8 @@ const StockManagement = () => {
   // --- NOVOS STATES PARA PESQUISA E ORDENAÇÃO ---
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOrder, setSortOrder] = useState("title-asc");
-  
   // State para controlar a visão de detalhes do grupo e modais
-  const [viewingGroup, setViewingGroup] = useState<StockGroupDetail | null>(null);
+  const [viewingGroup, setViewingGroup] = useState<GroupDetail | null>(null);
   const [productToManage, setProductToManage] = useState<Product | null>(null);
   const [loadingGroupDetails, setLoadingGroupDetails] = useState(false);
 
@@ -108,12 +107,12 @@ const StockManagement = () => {
       // Revertendo para a consulta implícita que estava funcionando corretamente.
       const { data, error } = await supabase
         .from('stock_groups')
-        .select('*, stock_group_products(count)')
+        .select('*, product_count:stock_group_products(count)') // Alias para product_count
         .eq('user_id', user.id)
         .order('created_at', { ascending: true });
         
       if (error) throw error;
-      setGroups(data as StockGroup[] || []);
+      setGroups(data.map(g => ({ ...g, product_count: g.product_count[0]?.count || 0 })) || []);
     } catch (error: any) {
       console.error("Erro ao buscar grupos de estoque:", error);
       toast.error("Erro ao buscar grupos de estoque.", { 
@@ -141,7 +140,7 @@ const StockManagement = () => {
     }
   };
 
-  const handleCreateGroup = async (name: string): Promise<StockGroup | null> => {
+  const handleCreateGroup = async (name: string): Promise<any | null> => {
     if (!name.trim()) {
       toast.warning("O nome do grupo não pode ser vazio.");
       return null;
@@ -149,31 +148,32 @@ const StockManagement = () => {
     try {
       const { data, error } = await supabase
         .from('stock_groups')
-        .insert({ group_name: name, user_id: user?.id })
-        .select()
+        .insert({ group_name: name, user_id: user?.id, product_count: 0 }) // Initialize product_count
+        .select('*')
         .single();
       if (error) throw error;
       toast.success(`Grupo "${name}" criado com sucesso!`);
       fetchGroups(); // Re-fetch all groups to update the list
-      return data;
+      return { ...data, product_count: 0 }; // Return with product_count for consistency
     } catch (error: any) {
       toast.error("Falha ao criar grupo.", { description: error.message });
       return null;
     }
   };
 
-  const handleViewGroup = async (group: StockGroup) => {
-    setLoadingGroupDetails(true);
+  const handleViewGroup = async (group: StockGroup | GroupDetail) => {
+    setLoadingGroupDetails(true); // Use specific loading state for group details
     const { data, error } = await supabase
       .from('stock_groups')
-      .select('*, products(*)')
+      .select(`*, stock_group_products(products(*))`)
       .eq('id', group.id)
       .single();
 
     if(error) {
       toast.error("Erro ao carregar detalhes do grupo.");
     } else if (data) {
-      setViewingGroup(data);
+      const productsFromJoinTable = data.stock_group_products.map((sgp: any) => sgp.products);
+      setViewingGroup({ ...data, products: productsFromJoinTable, product_count: data.stock_group_products.length });
     }
     setLoadingGroupDetails(false);
   };
@@ -210,7 +210,7 @@ const StockManagement = () => {
   }, [searchTerm, sortOrder]);
 
   // Se estiver vendo um grupo, mostra a tela de detalhes
-  if (viewingGroup) {
+  if (viewingGroup && !loadingGroupDetails) { // Only show detail view if not loading its data
     return (
         <GroupDetailView 
             group={viewingGroup}
@@ -220,6 +220,15 @@ const StockManagement = () => {
     )
   }
 
+  // Global loading for initial page load
+  if (loadingProducts || loadingGroups) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+        <p className="ml-2 text-gray-600">Carregando...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
@@ -286,8 +295,8 @@ const StockManagement = () => {
                         <TableHead>Status</TableHead>
                         <TableHead className="text-right">Preço</TableHead>
                         <TableHead className="text-right">Estoque</TableHead>
+                        <TableHead className="w-[50px]">Ações</TableHead>
                       </TableRow>
-                      <TableHead className="w-[50px]">Ações</TableHead>
                     </TableHeader>
                     <TableBody>
                       {loadingProducts ? (
@@ -361,7 +370,7 @@ const StockManagement = () => {
                         <CardHeader>
                             <CardTitle className="flex items-center"><Package className="w-5 h-5 mr-2 text-purple-600"/>{group.group_name}</CardTitle>
                             {/* ATUALIZADO: Exibe a contagem correta de produtos */}
-                            <CardDescription>{group.stock_group_products[0]?.count || 0} produtos neste grupo</CardDescription>
+                            <CardDescription>{group.product_count} produtos neste grupo</CardDescription>
                         </CardHeader>
                         <CardContent className="mt-auto text-center">
                             <p className="text-sm text-blue-600 font-semibold">Ver Detalhes</p>
@@ -381,7 +390,7 @@ const StockManagement = () => {
             product={productToManage}
             groups={groups}
             onCreateGroup={handleCreateGroup}
-            onClose={() => setProductToManage(null)}
+            onClose={() => { setProductToManage(null); fetchGroups(); }} // Re-fetch groups on close to update counts
         />
       )}
     </div>
@@ -389,9 +398,8 @@ const StockManagement = () => {
 };
 
 // --- NOVOS COMPONENTES PARA A NOVA INTERFACE ---
-
 // Componente para a tela de detalhes de um grupo
-const GroupDetailView = ({ group, onBack, onGroupUpdate }: { group: StockGroupDetail; onBack: () => void; onGroupUpdate: () => void }) => {
+const GroupDetailView = ({ group, onBack, onGroupUpdate }: { group: GroupDetail; onBack: () => void; onGroupUpdate: () => void }) => {
     const handleRemoveProduct = async (productId: string) => {
         const { error } = await supabase.from('stock_group_products').delete().match({ group_id: group.id, product_id: productId });
         if (error) {
@@ -446,7 +454,7 @@ const GroupDetailView = ({ group, onBack, onGroupUpdate }: { group: StockGroupDe
 };
 
 // Componente para o modal de adicionar a um grupo
-const AddToGroupModal = ({ product, groups, onClose, onCreateGroup }: { product: Product, groups: StockGroup[], onClose: () => void, onCreateGroup: (name: string) => Promise<StockGroup | null> }) => {
+const AddToGroupModal = ({ product, groups, onClose, onCreateGroup }: { product: Product, groups: StockGroup[], onClose: () => void, onCreateGroup: (name: string) => Promise<any | null> }) => {
     const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
     const [isCreatingNew, setIsCreatingNew] = useState(false);
     const [newGroupName, setNewGroupName] = useState("");
