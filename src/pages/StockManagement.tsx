@@ -1,197 +1,238 @@
+// src/pages/StockManagement.tsx
+
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import AppHeader from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
-import { Package, AlertCircle, TrendingUp, Settings, ArrowLeft, RefreshCw, Loader2 } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { PlusCircle, Package, Boxes, Loader2, RefreshCw } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
-// Definindo o tipo para os nossos produtos, baseado na tabela do DB
 interface Product {
-  id: number;
+  id: string;
   ml_item_id: string;
   title: string;
+  price: number;
   stock_quantity: number;
   status: string;
   permalink: string;
   thumbnail: string;
 }
 
+interface StockGroup {
+  id: string;
+  group_name: string;
+}
+
 const StockManagement = () => {
   const { user } = useAuth();
+  // State for products
   const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingProducts, setLoadingProducts] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  
+  // State for stock groups
+  const [groups, setGroups] = useState<StockGroup[]>([]);
+  const [loadingGroups, setLoadingGroups] = useState(true);
+  const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [savingGroup, setSavingGroup] = useState(false);
 
-  // Função para buscar os produtos do nosso banco de dados
   const fetchProducts = async () => {
     if (!user) return;
-    setLoading(true);
+    setLoadingProducts(true);
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
+      const { data, error } = await supabase.from('products').select('*').eq('user_id', user.id);
       if (error) throw error;
       setProducts(data || []);
     } catch (error: any) {
       toast.error("Erro ao buscar produtos.", { description: error.message });
     } finally {
-      setLoading(false);
+      setLoadingProducts(false);
+    }
+  };
+  
+  const fetchGroups = async () => {
+    if (!user) return;
+    setLoadingGroups(true);
+    try {
+      const { data, error } = await supabase.from('stock_groups').select('*').eq('user_id', user.id);
+      if (error) throw error;
+      setGroups(data || []);
+    } catch (error: any) {
+      toast.error("Erro ao buscar grupos de estoque.", { description: error.message });
+    } finally {
+      setLoadingGroups(false);
     }
   };
 
-  // Roda a função de busca quando a página carrega
   useEffect(() => {
     fetchProducts();
-  }, [user]);
+    fetchGroups();
+  }, []);
 
-  // Função para chamar a Edge Function de sincronização
   const handleSyncProducts = async () => {
     setSyncing(true);
-    toast.info("Iniciando sincronização com o Mercado Livre...");
     try {
       const { data, error } = await supabase.functions.invoke('mercado-livre-integration/sync-products');
-
       if (error) throw error;
-      
-      toast.success("Sincronização concluída!", { description: data.message });
-      await fetchProducts(); // Atualiza a lista de produtos na tela
-    } catch (error: any) {
-      toast.error("Falha na sincronização.", { description: error.message });
+      toast.success(data.message);
+      fetchProducts();
+    } catch(error: any) {
+      toast.error("Falha na sincronização", { description: error.message });
     } finally {
       setSyncing(false);
     }
   };
 
-  // Calculando estatísticas com base nos dados reais
-  const totalProducts = products.length;
-  const lowStockProducts = products.filter(p => p.stock_quantity <= 5).length;
-  const syncedProducts = products.filter(p => p.status === 'active').length;
-
-  const getStatusBadge = (stock: number) => {
-    if (stock <= 1) return { text: 'Crítico', className: 'bg-red-100 text-red-800' };
-    if (stock <= 5) return { text: 'Baixo', className: 'bg-yellow-100 text-yellow-800' };
-    return { text: 'OK', className: 'bg-green-100 text-green-800' };
+  const handleCreateGroup = async () => {
+    if (!newGroupName.trim()) {
+      toast.warning("O nome do grupo não pode ser vazio.");
+      return;
+    }
+    setSavingGroup(true);
+    try {
+      const { data, error } = await supabase
+        .from('stock_groups')
+        .insert({ group_name: newGroupName, user_id: user?.id })
+        .select()
+        .single();
+      if (error) throw error;
+      toast.success(`Grupo "${newGroupName}" criado com sucesso!`);
+      if(data) setGroups([...groups, data]);
+      setNewGroupName("");
+      setIsGroupDialogOpen(false);
+    } catch (error: any) {
+      toast.error("Falha ao criar grupo.", { description: error.message });
+    } finally {
+      setSavingGroup(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-4">
-              <Link to="/dashboard">
-                <Button variant="ghost" size="sm">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Voltar
-                </Button>
-              </Link>
-              <div className="flex items-center space-x-2">
-                <Package className="w-8 h-8 text-blue-600" />
-                <span className="text-xl font-bold text-gradient">Gestão de Estoque</span>
-              </div>
+    <div className="flex flex-col min-h-screen bg-gray-50">
+      <AppHeader />
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex justify-between items-center mb-8">
+            <div>
+                <h1 className="text-3xl font-bold text-gray-900">Gerenciador de Estoque</h1>
+                <p className="text-gray-600">Visualize, gerencie e agrupe o estoque de seus produtos.</p>
             </div>
-            <div className="flex items-center space-x-4">
-               <Button onClick={handleSyncProducts} disabled={syncing}>
-                {syncing ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+        </div>
+
+        <Tabs defaultValue="products" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="products">Todos os Produtos</TabsTrigger>
+            <TabsTrigger value="groups">Grupos de Estoque</TabsTrigger>
+          </TabsList>
+
+          {/* Aba de Produtos */}
+          <TabsContent value="products">
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle>Seus Produtos</CardTitle>
+                    <CardDescription>Lista de todos os seus produtos sincronizados do Mercado Livre.</CardDescription>
+                  </div>
+                  <Button onClick={handleSyncProducts} disabled={syncing}>
+                    {syncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2"/>}
+                    Sincronizar
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[80px]">Imagem</TableHead>
+                      <TableHead>Título</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Preço</TableHead>
+                      <TableHead className="text-right">Estoque</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loadingProducts ? (
+                      <TableRow><TableCell colSpan={5} className="text-center">Carregando...</TableCell></TableRow>
+                    ) : (
+                      products.map(product => (
+                        <TableRow key={product.id}>
+                          <TableCell><img src={product.thumbnail} alt={product.title} className="w-16 h-16 object-cover rounded-md" /></TableCell>
+                          <TableCell className="font-medium">{product.title}</TableCell>
+                          <TableCell><Badge variant={product.status === 'active' ? 'default' : 'secondary'}>{product.status}</Badge></TableCell>
+                          <TableCell className="text-right">R$ {product.price.toFixed(2)}</TableCell>
+                          <TableCell className="text-right">{product.stock_quantity}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Aba de Grupos de Estoque */}
+          <TabsContent value="groups">
+            <Card>
+              <CardHeader>
+                 <div className="flex justify-between items-center">
+                    <div>
+                      <CardTitle>Seus Grupos de Estoque</CardTitle>
+                      <CardDescription>Agrupe anúncios para sincronizar o estoque automaticamente.</CardDescription>
+                    </div>
+                     <Dialog open={isGroupDialogOpen} onOpenChange={setIsGroupDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline"><PlusCircle className="w-4 h-4 mr-2" />Criar Novo Grupo</Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                          <DialogTitle>Criar Novo Grupo de Estoque</DialogTitle>
+                          <DialogDescription>Dê um nome para seu grupo. Ex: "Projetor Hy320".</DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4"><div className="grid grid-cols-4 items-center gap-4"><Label htmlFor="name" className="text-right">Nome</Label><Input id="name" value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} className="col-span-3" placeholder="Nome do grupo"/></div></div>
+                        <DialogFooter><Button onClick={handleCreateGroup} disabled={savingGroup}>{savingGroup ? <Loader2 className="w-4 h-4 mr-2 animate-spin"/> : null}Salvar</Button></DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+              </CardHeader>
+              <CardContent>
+                {loadingGroups ? <p>Carregando grupos...</p> : groups.length === 0 ? (
+                  <div className="text-center py-16 text-gray-500 border-2 border-dashed rounded-lg">
+                      <Boxes className="w-12 h-12 mx-auto mb-4 text-gray-300"/>
+                      <h3 className="font-semibold text-lg">Nenhum grupo encontrado</h3>
+                      <p className="text-sm mt-2">Clique em "Criar Novo Grupo" para começar.</p>
+                  </div>
                 ) : (
-                  <RefreshCw className="w-4 h-4 mr-2" />
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {groups.map(group => (
+                      <Card key={group.id}>
+                        <CardHeader><CardTitle className="flex items-center"><Package className="w-5 h-5 mr-2 text-purple-600"/>{group.group_name}</CardTitle><CardDescription>0 produtos neste grupo</CardDescription></CardHeader>
+                        <CardContent><Button variant="outline" className="w-full" disabled>Adicionar Produto (em breve)</Button></CardContent>
+                      </Card>
+                    ))}
+                  </div>
                 )}
-                Sincronizar com Mercado Livre
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Cards com dados reais */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }}>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total de Produtos</CardTitle>
-                <Package className="h-4 w-4 text-blue-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-blue-600">{totalProducts}</div>
-                <p className="text-xs text-gray-600">anúncios encontrados</p>
               </CardContent>
             </Card>
-          </motion.div>
-
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }}>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Estoque Baixo</CardTitle>
-                <AlertCircle className="h-4 w-4 text-orange-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-orange-600">{lowStockProducts}</div>
-                <p className="text-xs text-gray-600">produtos com 5 ou menos unid.</p>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }}>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Anúncios Ativos</CardTitle>
-                <TrendingUp className="h-4 w-4 text-green-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">{syncedProducts}</div>
-                <p className="text-xs text-gray-600">sincronizados e ativos no ML</p>
-              </CardContent>
-            </Card>
-          </motion.div>
-        </div>
-
-        {/* Lista de Produtos */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Seu Estoque</CardTitle>
-            <CardDescription>Lista dos seus produtos sincronizados do Mercado Livre.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <p>Carregando produtos...</p>
-            ) : products.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-gray-500 mb-4">Nenhum produto encontrado.</p>
-                <p className="text-sm text-gray-400">Clique em "Sincronizar com Mercado Livre" para buscar seus anúncios.</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {products.map((product) => {
-                    const statusBadge = getStatusBadge(product.stock_quantity);
-                    return (
-                        <a href={product.permalink} target="_blank" rel="noopener noreferrer" key={product.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                            <div className="flex items-center space-x-4">
-                                <img src={product.thumbnail} alt={product.title} className="w-12 h-12 rounded-md object-cover" />
-                                <div>
-                                    <p className="font-medium text-sm">{product.title}</p>
-                                    <p className="text-xs text-gray-600">Estoque: {product.stock_quantity} unidades</p>
-                                </div>
-                            </div>
-                            <div className={`px-2 py-1 rounded-full text-xs font-semibold ${statusBadge.className}`}>
-                                {statusBadge.text}
-                            </div>
-                        </a>
-                    )
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+          </TabsContent>
+        </Tabs>
+      </main>
     </div>
   );
 };
