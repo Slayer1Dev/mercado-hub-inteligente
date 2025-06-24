@@ -57,7 +57,7 @@ const StockManagement = () => {
     if (!user) return;
     setLoadingProducts(true);
     try {
-      const { data, error } = await supabase.from('products').select('*').eq('user_id', user.id);
+      const { data, error } = await supabase.from('products').select('*').eq('user_id', user.id).order('title', { ascending: true });
       if (error) throw error;
       setProducts(data || []);
     } catch (error: any) {
@@ -71,7 +71,7 @@ const StockManagement = () => {
     if (!user) return;
     setLoadingGroups(true);
     try {
-      const { data, error } = await supabase.from('stock_groups').select('*').eq('user_id', user.id);
+      const { data, error } = await supabase.from('stock_groups').select('*').eq('user_id', user.id).order('created_at', { ascending: true });
       if (error) throw error;
       setGroups(data || []);
     } catch (error: any) {
@@ -81,18 +81,23 @@ const StockManagement = () => {
     }
   };
 
+  // CORREÇÃO APLICADA AQUI
   useEffect(() => {
-    fetchProducts();
-    fetchGroups();
-  }, []);
+    // A busca só acontece DEPOIS que a informação do usuário estiver disponível
+    if (user) {
+      fetchProducts();
+      fetchGroups();
+    }
+  }, [user]); // A dependência [user] é a chave da correção
 
   const handleSyncProducts = async () => {
     setSyncing(true);
+    toast.info("Iniciando sincronização com o Mercado Livre...");
     try {
       const { data, error } = await supabase.functions.invoke('mercado-livre-integration/sync-products');
       if (error) throw error;
-      toast.success(data.message);
-      fetchProducts();
+      toast.success(data.message || "Sincronização concluída!");
+      await fetchProducts(); // Atualiza a lista após sincronizar
     } catch(error: any) {
       toast.error("Falha na sincronização", { description: error.message });
     } finally {
@@ -152,37 +157,41 @@ const StockManagement = () => {
                   </div>
                   <Button onClick={handleSyncProducts} disabled={syncing}>
                     {syncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2"/>}
-                    Sincronizar
+                    Sincronizar Produtos
                   </Button>
                 </div>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[80px]">Imagem</TableHead>
-                      <TableHead>Título</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Preço</TableHead>
-                      <TableHead className="text-right">Estoque</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {loadingProducts ? (
-                      <TableRow><TableCell colSpan={5} className="text-center">Carregando...</TableCell></TableRow>
-                    ) : (
-                      products.map(product => (
-                        <TableRow key={product.id}>
-                          <TableCell><img src={product.thumbnail} alt={product.title} className="w-16 h-16 object-cover rounded-md" /></TableCell>
-                          <TableCell className="font-medium">{product.title}</TableCell>
-                          <TableCell><Badge variant={product.status === 'active' ? 'default' : 'secondary'}>{product.status}</Badge></TableCell>
-                          <TableCell className="text-right">R$ {product.price.toFixed(2)}</TableCell>
-                          <TableCell className="text-right">{product.stock_quantity}</TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
+                <div className="border rounded-lg">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[80px]">Imagem</TableHead>
+                        <TableHead>Título</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Preço</TableHead>
+                        <TableHead className="text-right">Estoque</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {loadingProducts ? (
+                        <TableRow><TableCell colSpan={5} className="text-center h-24">Carregando produtos...</TableCell></TableRow>
+                      ) : products.length > 0 ? (
+                        products.map(product => (
+                          <TableRow key={product.id}>
+                            <TableCell><img src={product.thumbnail} alt={product.title} className="w-12 h-12 object-cover rounded-md" /></TableCell>
+                            <TableCell className="font-medium">{product.title}</TableCell>
+                            <TableCell><Badge variant={product.status === 'active' ? 'default' : 'secondary'}>{product.status}</Badge></TableCell>
+                            <TableCell className="text-right">R$ {product.price?.toFixed(2)}</TableCell>
+                            <TableCell className="text-right">{product.stock_quantity}</TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                         <TableRow><TableCell colSpan={5} className="text-center h-24 text-gray-500">Nenhum produto encontrado. Clique em "Sincronizar Produtos".</TableCell></TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
