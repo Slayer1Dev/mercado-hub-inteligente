@@ -101,15 +101,23 @@ const StockManagement = () => {
     if (!user) return;
     setLoadingGroups(true);
     try {
+      // A consulta agora é feita de forma explícita, o que resolve o erro.
       const { data, error } = await supabase
         .from('stock_groups')
-        .select('*, stock_group_products(count)')
+        .select(`
+          *,
+          stock_group_products!group_id(count)
+        `)
         .eq('user_id', user.id)
         .order('created_at', { ascending: true });
+        
       if (error) throw error;
       setGroups(data as StockGroup[] || []);
     } catch (error: any) {
-      toast.error("Erro ao buscar grupos de estoque.", { description: error.message });
+      console.error("Erro ao buscar grupos de estoque:", error);
+      toast.error("Erro ao buscar grupos de estoque.", { 
+        description: error.message || "Verifique a conexão com o banco de dados." 
+      });
     } finally {
       setLoadingGroups(false);
     }
