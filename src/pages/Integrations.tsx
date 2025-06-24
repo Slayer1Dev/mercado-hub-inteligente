@@ -8,16 +8,16 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import {
-  Link as LinkIcon,
-  CheckCircle,
-  XCircle,
-  Loader2,
-  ShoppingBag,
+import { 
+  Link as LinkIcon, 
+  CheckCircle, 
+  XCircle, 
+  Loader2, 
+  ShoppingBag, 
   Bot,
   AlertCircle,
   RefreshCw,
-  Eye,
+  Eye
 } from 'lucide-react';
 import { toast } from 'sonner';
 import AppHeader from '@/components/AppHeader';
@@ -66,13 +66,12 @@ const Integrations = () => {
   };
 
   const loadIntegrations = async () => {
+    if (!user) return;
     try {
-      if (!user) return;
       const { data, error } = await supabase
         .from('user_integrations')
         .select('*')
         .eq('user_id', user.id);
-
       if (error) throw error;
       setIntegrations(data || []);
     } catch (error) {
@@ -84,8 +83,8 @@ const Integrations = () => {
   };
 
   const loadLogs = async () => {
+    if (!user) return;
     try {
-      if (!user) return;
       const { data, error } = await supabase
         .from('integration_logs')
         .select('*')
@@ -105,17 +104,14 @@ const Integrations = () => {
     try {
       const headers = await getAuthHeaders();
       const { data, error } = await supabase.functions.invoke('mercado-livre-integration/oauth-start', { headers });
-
       if (error) throw error;
-
       if (data?.authUrl) {
         window.location.href = data.authUrl;
       } else {
         throw new Error('URL de autorização não recebida');
       }
-    } catch (error) {
-      console.error('Erro ao conectar Mercado Livre:', error);
-      toast.error('Erro ao conectar com Mercado Livre');
+    } catch (error: any) {
+      toast.error('Erro ao conectar com Mercado Livre', { description: error.message });
       setConnecting(null);
     }
   };
@@ -125,26 +121,23 @@ const Integrations = () => {
     try {
       const headers = await getAuthHeaders();
       const { data, error } = await supabase.functions.invoke('gemini-ai/test', { headers });
-
       if (error) throw error;
-
       if (data?.connected) {
         toast.success('Conexão com Gemini AI funcionando!');
-        if (user) {
+        if(user) {
             await supabase.from('user_integrations').upsert({
             user_id: user.id,
             integration_type: 'gemini',
             is_connected: true,
             last_sync: new Date().toISOString(),
-            }, { onConflict: 'user_id, integration_type' });
+          }, { onConflict: 'user_id, integration_type' });
         }
         loadIntegrations();
       } else {
         toast.error(data?.error || 'Falha na conexão com Gemini AI');
       }
-    } catch (error) {
-      console.error('Erro ao testar Gemini:', error);
-      toast.error('Erro ao testar conexão com Gemini AI');
+    } catch (error: any) {
+      toast.error('Erro ao testar conexão com Gemini AI', { description: error.message });
     } finally {
       setConnecting(null);
     }
@@ -155,13 +148,10 @@ const Integrations = () => {
     try {
       const headers = await getAuthHeaders();
       const { data, error } = await supabase.functions.invoke('mercado-livre-integration/sync-questions', { headers });
-
       if (error) throw error;
-
       toast.success(data.message || 'Sincronização iniciada com sucesso!');
       loadLogs();
     } catch (error: any) {
-      console.error('Erro na sincronização:', error);
       toast.error('Erro na sincronização de perguntas', { description: error.message });
     } finally {
       setConnecting(null);
@@ -171,7 +161,7 @@ const Integrations = () => {
   const getIntegrationStatus = (type: string) => {
     return integrations.find(i => i.integration_type === type)?.is_connected || false;
   };
-
+  
   const getStatusBadge = (connected: boolean) => (
     connected ? (
       <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">
@@ -211,7 +201,6 @@ const Integrations = () => {
         </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          {/* Card do Mercado Livre */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
             <Card className="border-0 shadow-sm">
               <CardHeader>
@@ -236,7 +225,7 @@ const Integrations = () => {
                       </Button>
                     ) : (
                       <Button onClick={syncQuestions} disabled={connecting === 'sync'} variant="outline">
-                        {connecting === 'sync' ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />} Sincronizar
+                        {connecting === 'sync' ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />} Sincronizar Perguntas
                       </Button>
                     )}
                   </div>
@@ -245,7 +234,6 @@ const Integrations = () => {
             </Card>
           </motion.div>
 
-          {/* Card do Gemini AI */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
             <Card className="border-0 shadow-sm">
               <CardHeader>
