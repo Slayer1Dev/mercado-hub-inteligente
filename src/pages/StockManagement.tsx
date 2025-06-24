@@ -11,15 +11,42 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-// Interfaces... (sem alteração)
-interface Product { /* ... */ }
-interface StockGroup { /* ... */ }
+interface Product {
+  id: string;
+  ml_item_id: string;
+  title: string;
+  price: number;
+  stock_quantity: number;
+  status: string;
+  permalink: string;
+  thumbnail: string;
+}
+
+interface StockGroup {
+  id: string;
+  group_name: string;
+}
 
 const ITEMS_PER_PAGE = 10;
 
@@ -28,29 +55,94 @@ const StockManagement = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  
   const [groups, setGroups] = useState<StockGroup[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(true);
   const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [savingGroup, setSavingGroup] = useState(false);
+
   const [currentPage, setCurrentPage] = useState(1);
 
   // --- NOVOS STATES PARA PESQUISA E ORDENAÇÃO ---
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOrder, setSortOrder] = useState("title-asc");
 
-  // ... (funções fetchProducts, fetchGroups, handleSyncProducts, handleCreateGroup não mudam) ...
-  const fetchProducts = async () => { /* ... */ };
-  const fetchGroups = async () => { /* ... */ };
-  const handleSyncProducts = async () => { /* ... */ };
-  const handleCreateGroup = async () => { /* ... */ };
-  
   useEffect(() => {
     if (user) {
       fetchProducts();
       fetchGroups();
     }
   }, [user]);
+
+  const fetchProducts = async () => {
+    if (!user) return;
+    setLoadingProducts(true);
+    try {
+      const { data, error } = await supabase.from('products').select('*').eq('user_id', user.id).order('title', { ascending: true });
+      if (error) throw error;
+      setProducts(data || []);
+    } catch (error: any) {
+      toast.error("Erro ao buscar produtos.", { description: error.message });
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
+  
+  const fetchGroups = async () => {
+    if (!user) return;
+    setLoadingGroups(true);
+    try {
+      const { data, error } = await supabase.from('stock_groups').select('*').eq('user_id', user.id).order('created_at', { ascending: true });
+      if (error) throw error;
+      setGroups(data || []);
+    } catch (error: any) {
+      toast.error("Erro ao buscar grupos de estoque.", { description: error.message });
+    } finally {
+      setLoadingGroups(false);
+    }
+  };
+
+  const handleSyncProducts = async () => {
+    setSyncing(true);
+    toast.info("Sincronização completa iniciada. Isso pode levar alguns minutos...", {
+      description: "Estamos buscando todos os seus produtos no Mercado Livre.",
+    });
+    try {
+      const { data, error } = await supabase.functions.invoke('mercado-livre-integration/sync-products');
+      if (error) throw error;
+      toast.success(data.message || "Sincronização concluída!");
+      await fetchProducts();
+    } catch(error: any) {
+      toast.error("Falha na sincronização", { description: error.message });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleCreateGroup = async () => {
+    if (!newGroupName.trim()) {
+      toast.warning("O nome do grupo não pode ser vazio.");
+      return;
+    }
+    setSavingGroup(true);
+    try {
+      const { data, error } = await supabase
+        .from('stock_groups')
+        .insert({ group_name: newGroupName, user_id: user?.id })
+        .select()
+        .single();
+      if (error) throw error;
+      toast.success(`Grupo "${newGroupName}" criado com sucesso!`);
+      if(data) setGroups([...groups, data]);
+      setNewGroupName("");
+      setIsGroupDialogOpen(false);
+    } catch (error: any) {
+      toast.error("Falha ao criar grupo.", { description: error.message });
+    } finally {
+      setSavingGroup(false);
+    }
+  };
 
   // --- LÓGICA DE FILTRO E ORDENAÇÃO ---
   const filteredAndSortedProducts = useMemo(() => {
@@ -103,6 +195,7 @@ const StockManagement = () => {
 
           <TabsContent value="products">
             <Card>
+              {/* === BOTÃO RESTAURADO AQUI === */}
               <CardHeader>
                 <div className="flex justify-between items-center">
                   <div>
@@ -139,7 +232,6 @@ const StockManagement = () => {
                     </SelectContent>
                   </Select>
                 </div>
-
                 <div className="border rounded-lg">
                   <Table>
                     <TableHeader>
@@ -170,7 +262,6 @@ const StockManagement = () => {
                     </TableBody>
                   </Table>
                 </div>
-
                 {pageCount > 1 && (
                   <div className="mt-6 flex justify-center">
                     <Pagination>
@@ -178,6 +269,7 @@ const StockManagement = () => {
                         <PaginationItem>
                           <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); setCurrentPage(p => Math.max(1, p - 1)); }} />
                         </PaginationItem>
+                        {/* Simplificando a renderização da paginação para evitar sobrecarga */}
                         <PaginationItem>
                           <span className="px-4 py-2 text-sm">Página {currentPage} de {pageCount}</span>
                         </PaginationItem>
@@ -191,9 +283,49 @@ const StockManagement = () => {
               </CardContent>
             </Card>
           </TabsContent>
-          
+
           <TabsContent value="groups">
-            {/* ... (código da aba de grupos, sem alterações) ... */}
+            <Card>
+              <CardHeader>
+                 <div className="flex justify-between items-center">
+                    <div>
+                      <CardTitle>Seus Grupos de Estoque</CardTitle>
+                      <CardDescription>Agrupe anúncios para sincronizar o estoque automaticamente.</CardDescription>
+                    </div>
+                     <Dialog open={isGroupDialogOpen} onOpenChange={setIsGroupDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline"><PlusCircle className="w-4 h-4 mr-2" />Criar Novo Grupo</Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                          <DialogTitle>Criar Novo Grupo de Estoque</DialogTitle>
+                          <DialogDescription>Dê um nome para seu grupo. Ex: "Projetor Hy320".</DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4"><div className="grid grid-cols-4 items-center gap-4"><Label htmlFor="name" className="text-right">Nome</Label><Input id="name" value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} className="col-span-3" placeholder="Nome do grupo"/></div></div>
+                        <DialogFooter><Button onClick={handleCreateGroup} disabled={savingGroup}>{savingGroup ? <Loader2 className="w-4 h-4 mr-2 animate-spin"/> : null}Salvar</Button></DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+              </CardHeader>
+              <CardContent>
+                {loadingGroups ? <p>Carregando grupos...</p> : groups.length === 0 ? (
+                  <div className="text-center py-16 text-gray-500 border-2 border-dashed rounded-lg">
+                      <Boxes className="w-12 h-12 mx-auto mb-4 text-gray-300"/>
+                      <h3 className="font-semibold text-lg">Nenhum grupo encontrado</h3>
+                      <p className="text-sm mt-2">Clique em "Criar Novo Grupo" para começar.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {groups.map(group => (
+                      <Card key={group.id}>
+                        <CardHeader><CardTitle className="flex items-center"><Package className="w-5 h-5 mr-2 text-purple-600"/>{group.group_name}</CardTitle><CardDescription>0 produtos neste grupo</CardDescription></CardHeader>
+                        <CardContent><Button variant="outline" className="w-full" disabled>Adicionar Produto (em breve)</Button></CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </main>
