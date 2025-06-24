@@ -220,10 +220,13 @@ async function handleOAuthStart(req: Request, supabase: any) {
         headers: corsHeaders,
       });
     }
+    
+    // --- CORREÇÃO ADICIONADA AQUI ---
+    // Adicionamos os escopos 'read' e 'offline_access' para obter as permissões corretas
+    const scopes = 'read offline_access';
+    const authUrl = `https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=${ML_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${user.id}&scope=${encodeURIComponent(scopes)}`;
 
-    const authUrl = `https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=${ML_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${user.id}`;
-
-    await createLog(supabase, user.id, 'oauth_start', 'success', 'URL de autorização gerada', { authUrl });
+    await createLog(supabase, user.id, 'oauth_start', 'success', 'URL de autorização gerada com os escopos corretos', { authUrl });
 
     return new Response(JSON.stringify({ authUrl }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -496,7 +499,7 @@ serve(async (req) => {
     if (pathname.includes('/sync-questions')) { return await handleSyncQuestions(req, supabase, user); }
     if (pathname.includes('/answer-question')) { return await handleAnswerQuestion(req, supabase, user); }
 
-    return new Response(JSON.stringify({ error: "Rota não encontrada" }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+    return new Respaonse(JSON.stringify({ error: "Rota não encontrada" }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
   } catch (err) {
     console.error('Erro geral:', err);
     return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
