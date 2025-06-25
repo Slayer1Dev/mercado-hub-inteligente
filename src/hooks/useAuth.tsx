@@ -1,3 +1,4 @@
+// src/hooks/useAuth.tsx
 
 import { useState, useEffect } from 'react';
 import { User, Session } from '@supabase/supabase-js';
@@ -27,27 +28,26 @@ export const useAuth = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        loadUserData(session.user.id);
-        updateOnlineStatus(true);
-      }
-      setLoading(false);
-    });
+    const loadAuthData = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          await loadUserData(session.user.id);
+          await updateOnlineStatus(true);
+        }
+        setLoading(false);
+    };
+    
+    loadAuthData();
 
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        loadUserData(session.user.id);
-        updateOnlineStatus(true);
+        await loadUserData(session.user.id);
+        await updateOnlineStatus(true);
       } else {
         setProfile(null);
         setSubscription(null);
@@ -61,39 +61,28 @@ export const useAuth = () => {
 
   const loadUserData = async (userId: string) => {
     try {
-      // Load profile
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
+      // Carrega perfil e assinatura em paralelo
+      const [profileResponse, subscriptionResponse, isAdminResponse] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', userId).single(),
+        supabase.from('user_subscriptions').select('plan_type, plan_status, expires_at').eq('user_id', userId).single(),
+        // --- CORREÇÃO APLICADA AQUI ---
+        // Usando a nova função RPC para verificar se é admin
+        supabase.rpc('is_current_user_admin')
+      ]);
 
-      if (profileData) {
-        setProfile(profileData);
-      }
+      if (profileResponse.data) setProfile(profileResponse.data);
+      if (subscriptionResponse.data) setSubscription(subscriptionResponse.data);
+      
+      // Define o status de admin com base na resposta da função RPC
+      setIsAdmin(isAdminResponse.data || false);
+      
+      // Trata os erros, se houver
+      if (profileResponse.error) throw profileResponse.error;
+      if (subscriptionResponse.error) throw subscriptionResponse.error;
+      if (isAdminResponse.error) throw isAdminResponse.error;
 
-      // Load subscription
-      const { data: subscriptionData } = await supabase
-        .from('user_subscriptions')
-        .select('plan_type, plan_status, expires_at')
-        .eq('user_id', userId)
-        .single();
-
-      if (subscriptionData) {
-        setSubscription(subscriptionData);
-      }
-
-      // Check if admin
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .eq('role', 'admin')
-        .single();
-
-      setIsAdmin(!!roleData);
     } catch (error) {
-      console.error('Error loading user data:', error);
+      console.error('Erro ao carregar dados do usuário:', error);
     }
   };
 
@@ -101,20 +90,13 @@ export const useAuth = () => {
     try {
       await supabase.rpc('update_user_online_status', { is_online: isOnline });
     } catch (error) {
-      console.error('Error updating online status:', error);
+      console.error('Erro ao atualizar status online:', error);
     }
   };
 
-  const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { data, error };
-  };
-
-  const signUp = async (email: string, password: string, name?: string) => {
-    const { data, error } = await supabase.auth.signUp({
+  const signIn = (email: string, password: string) => supabase.auth.signInWithPassword({ email, password });
+  
+  const signUp = (email: string, password: string, name?: string) => supabase.auth.signUp({
       email,
       password,
       options: {
@@ -122,30 +104,21 @@ export const useAuth = () => {
         data: name ? { name } : undefined,
       },
     });
-    return { data, error };
-  };
 
   const signOut = async () => {
     await updateOnlineStatus(false);
-    const { error } = await supabase.auth.signOut();
-    return { error };
+    return supabase.auth.signOut();
   };
-
+  
   const hasAccess = () => {
     if (isAdmin) return true;
     if (!subscription) return false;
-    
     if (subscription.plan_status === 'active') {
-      if (subscription.expires_at) {
-        return new Date(subscription.expires_at) > new Date();
-      }
-      return true;
+      return !subscription.expires_at || new Date(subscription.expires_at) > new Date();
     }
-    
     return false;
   };
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (user) {
