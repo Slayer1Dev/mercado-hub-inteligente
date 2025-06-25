@@ -1,3 +1,5 @@
+// src/pages/StockManagement.tsx
+
 import { useState, useEffect, useMemo } from "react";
 import AppHeader from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
@@ -10,7 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -36,7 +38,7 @@ interface StockGroup {
 }
 
 interface GroupDetail extends StockGroup {
-    products: Product[];
+  products: Product[];
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -70,7 +72,9 @@ const StockManagement = () => {
     };
 
     useEffect(() => {
+      if (user) {
         fetchAllData();
+      }
     }, [user]);
 
     const fetchProducts = async () => {
@@ -96,7 +100,7 @@ const StockManagement = () => {
             const { data, error } = await supabase.from('stock_groups').insert({ group_name: name, user_id: user?.id }).select().single();
             if (error) throw error;
             toast.success(`Grupo "${name}" criado com sucesso!`);
-            fetchGroups();
+            await fetchGroups();
             return data;
         } catch (error: any) {
             toast.error("Falha ao criar grupo.", { description: error.message });
@@ -117,10 +121,40 @@ const StockManagement = () => {
         }
     }
 
-    const handleSyncProducts = async () => { /* ... (seu código funcional) ... */ };
-    const filteredAndSortedProducts = useMemo(() => { /* ... (seu código funcional) ... */ }, [products, searchTerm, sortOrder]);
+    const handleSyncProducts = async () => {
+        setSyncing(true);
+        toast.info("Sincronização completa iniciada. Pode levar alguns minutos.");
+        try {
+            const { data, error } = await supabase.functions.invoke('mercado-livre-integration/sync-products');
+            if (error) throw error;
+            toast.success(data.message || "Sincronização concluída!");
+            await fetchProducts();
+        } catch(error: any) {
+            toast.error("Falha na sincronização", { description: error.message });
+        } finally {
+            setSyncing(false);
+        }
+    };
+
+    const filteredAndSortedProducts = useMemo(() => {
+      let result = [...products].filter(p => p.title.toLowerCase().includes(searchTerm.toLowerCase()));
+      result.sort((a, b) => {
+        switch (sortOrder) {
+          case 'price-asc': return a.price - b.price;
+          case 'price-desc': return b.price - a.price;
+          case 'title-desc': return b.title.localeCompare(a.title);
+          default: return a.title.localeCompare(b.title);
+        }
+      });
+      return result;
+    }, [products, searchTerm, sortOrder]);
+  
     const pageCount = Math.ceil(filteredAndSortedProducts.length / ITEMS_PER_PAGE);
-    const paginatedProducts = useMemo(() => { /* ... (seu código funcional) ... */ }, [filteredAndSortedProducts, currentPage]);
+    const paginatedProducts = useMemo(() => {
+        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+        return filteredAndSortedProducts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [filteredAndSortedProducts, currentPage]);
+    
     useEffect(() => { setCurrentPage(1); }, [searchTerm, sortOrder]);
   
     if (loading) {
@@ -164,33 +198,33 @@ const StockManagement = () => {
                 <TabsContent value="products">
                     <Card>
                         <CardHeader>
-                            <div className="flex justify-between items-center">
+                            <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
                                 <div>
                                     <CardTitle>Seus Produtos</CardTitle>
                                     <CardDescription>Lista de todos os seus produtos sincronizados.</CardDescription>
                                 </div>
-                                <Button onClick={handleSyncProducts} disabled={syncing}>
-                                    {syncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2"/>}
-                                    Sincronizar Produtos
-                                </Button>
+                                <div className="flex items-center space-x-4">
+                                    <div className="relative flex-1 md:w-64">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+                                        <Input placeholder="Pesquisar por título..." className="pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                                    </div>
+                                    <Select value={sortOrder} onValueChange={setSortOrder}>
+                                        <SelectTrigger className="w-[180px]"><SelectValue placeholder="Ordenar por..." /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="title-asc">Título (A-Z)</SelectItem>
+                                            <SelectItem value="title-desc">Título (Z-A)</SelectItem>
+                                            <SelectItem value="price-asc">Preço (Menor)</SelectItem>
+                                            <SelectItem value="price-desc">Preço (Maior)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <Button onClick={handleSyncProducts} disabled={syncing}>
+                                        {syncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2"/>}
+                                        Sincronizar
+                                    </Button>
+                                </div>
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <div className="flex items-center space-x-4 mb-4">
-                                <div className="relative flex-1">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-                                    <Input placeholder="Pesquisar por título..." className="pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-                                </div>
-                                <Select value={sortOrder} onValueChange={setSortOrder}>
-                                    <SelectTrigger className="w-[220px]"><SelectValue placeholder="Ordenar por..." /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="title-asc">Título (A-Z)</SelectItem>
-                                        <SelectItem value="title-desc">Título (Z-A)</SelectItem>
-                                        <SelectItem value="price-asc">Preço (Menor para Maior)</SelectItem>
-                                        <SelectItem value="price-desc">Preço (Maior para Menor)</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
                             <div className="border rounded-lg">
                                 <Table>
                                     <TableHeader>
@@ -257,13 +291,13 @@ const StockManagement = () => {
                           ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {groups.map(group => (
-                                <Card key={group.id} className="flex flex-col hover:shadow-md transition-shadow">
+                                <Card key={group.id} className="flex flex-col hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleViewGroup(group)}>
                                     <CardHeader>
                                         <CardTitle className="flex items-center"><Package className="w-5 h-5 mr-2 text-purple-600"/>{group.group_name}</CardTitle>
                                         <CardDescription>{group.product_count} produtos neste grupo</CardDescription>
                                     </CardHeader>
-                                    <CardContent className="mt-auto">
-                                        <Button variant="outline" className="w-full" onClick={() => handleViewGroup(group)}>Gerenciar Grupo</Button>
+                                    <CardContent className="mt-auto text-center text-blue-600 font-semibold">
+                                        Gerenciar Grupo
                                     </CardContent>
                                 </Card>
                                 ))}
@@ -289,7 +323,7 @@ const StockManagement = () => {
     );
 };
   
-// --- Componentes Filhos (GroupDetailView, AddToGroupModal, CreateGroupDialog) ---
-// Cole aqui as versões completas desses componentes que eu forneci anteriormente.
+// --- Componentes Filhos devem ser colados aqui ---
+// ... GroupDetailView, AddToGroupModal, CreateGroupDialog ...
 
 export default StockManagement;
