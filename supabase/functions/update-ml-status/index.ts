@@ -14,22 +14,29 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SERVICE_ROLE_KEY')!
-    );
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SERVICE_ROLE_KEY')!
+  );
+  
+  let userIdForLog: string | null = null;
 
-    const { data: { user } } = await supabase.auth.getUser((req.headers.get('Authorization')!).replace('Bearer ', ''));
+  try {
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) throw new Error('Token de autorização ausente');
+
+    const { data: { user } } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
     if (!user) throw new Error('Usuário não autenticado');
+    userIdForLog = user.id;
 
     const { item_id, status } = await req.json();
     if (!item_id || !['active', 'paused'].includes(status)) {
-      throw new Error('Parâmetros inválidos: item_id e status são necessários.');
+      throw new Error('Parâmetros inválidos: item_id e status ("active" ou "paused") são necessários.');
     }
 
     const accessToken = await getValidAccessToken(supabase, user.id);
 
+    // 1. Faz a chamada para a API do Mercado Livre
     const mlResponse = await fetch(`https://api.mercadolibre.com/items/${item_id}`, {
       method: 'PUT',
       headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
@@ -41,10 +48,20 @@ serve(async (req) => {
       throw new Error(errorBody.message || 'Erro ao atualizar status no Mercado Livre.');
     }
 
-    await createLog(supabase, user.id, 'update_status', 'success', `Status do item ${item_id} atualizado para ${status}.`, { item_id });
-    return new Response(JSON.stringify({ success: true }), { headers: corsHeaders });
+    // 2. CORREÇÃO: Atualiza o status no seu banco de dados local para manter consistência
+    await supabase
+      .from('products')
+      .update({ status: status })
+      .eq('ml_item_id', item_id)
+      .eq('user_id', user.id);
+
+    const successMessage = `Anúncio ${status === 'active' ? 'ativado' : 'pausado'}.`;
+    await createLog(supabase, user.id, 'update_status', 'success', successMessage, { item_id });
+    
+    return new Response(JSON.stringify({ success: true, message: successMessage }), { headers: corsHeaders });
 
   } catch (err) {
+    await createLog(supabase, userIdForLog, 'update_status', 'error', err.message, null);
     return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
   }
 });
