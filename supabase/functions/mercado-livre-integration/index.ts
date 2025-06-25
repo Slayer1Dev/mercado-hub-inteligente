@@ -157,6 +157,28 @@ async function handleSyncProducts(req: Request, supabase: any, user: any) {
     return new Response(JSON.stringify({ message: successMessage }), { headers: corsHeaders });
 }
 
+// NOVA FUNÇÃO PARA DESCONECTAR
+async function handleDisconnect(req: Request, supabase: any, user: any) {
+  await createLog(supabase, user.id, 'disconnect', 'info', 'Iniciando desconexão do Mercado Livre.', null);
+
+  const { error } = await supabase
+    .from('user_integrations')
+    .delete()
+    .eq('user_id', user.id)
+    .eq('integration_type', 'mercado_livre');
+
+  if (error) {
+    await createLog(supabase, user.id, 'disconnect', 'error', 'Falha ao remover integração do banco de dados.', { error: error.message });
+    throw new Error("Não foi possível remover a integração.");
+  }
+
+  await createLog(supabase, user.id, 'disconnect', 'success', 'Integração com Mercado Livre removida com sucesso.', null);
+  
+  return new Response(JSON.stringify({ message: "Desconectado com sucesso." }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
 
 // --- Servidor Principal ---
 serve(async (req) => {
@@ -195,6 +217,10 @@ serve(async (req) => {
     }
     if (pathname.includes('/sync-products')) {
       return await handleSyncProducts(req, supabase, user);
+    }
+    // NOVA ROTA ADICIONADA
+    if (pathname.includes('/disconnect')) {
+      return await handleDisconnect(req, supabase, user);
     }
     
     return new Response(JSON.stringify({ error: "Rota não encontrada" }), { status: 404, headers: corsHeaders });

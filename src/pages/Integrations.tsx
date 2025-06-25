@@ -1,3 +1,5 @@
+// src/pages/Integrations.tsx
+
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,7 +17,8 @@ import {
   Bot,
   AlertCircle,
   RefreshCw,
-  Eye
+  Eye,
+  Unplug // Ícone novo
 } from 'lucide-react';
 import { toast } from 'sonner';
 import AppHeader from '@/components/AppHeader';
@@ -47,7 +50,6 @@ const Integrations = () => {
   const [connecting, setConnecting] = useState<string | null>(null);
   const [showLogs, setShowLogs] = useState(false);
 
-  // CORREÇÃO: Usando Promise.all para um carregamento robusto
   useEffect(() => {
     if (user) {
       setLoading(true);
@@ -55,7 +57,6 @@ const Integrations = () => {
         .catch(err => console.error("Erro ao carregar dados da página de integrações:", err))
         .finally(() => setLoading(false));
     } else {
-      // Se não há usuário (ou ao fazer logout), para de carregar
       setLoading(false);
     }
   }, [user]);
@@ -114,6 +115,24 @@ const Integrations = () => {
     } catch (error: any) {
       toast.error('Erro ao conectar com Mercado Livre', { description: error.message });
       setConnecting(null);
+    }
+  };
+
+  // NOVA FUNÇÃO PARA DESCONECTAR
+  const disconnectMercadoLivre = async () => {
+    setConnecting('disconnect_ml');
+    toast.info("Desconectando do Mercado Livre...");
+    try {
+        const headers = await getAuthHeaders();
+        const { error } = await supabase.functions.invoke('mercado-livre-integration/disconnect', { headers });
+        if (error) throw error;
+
+        toast.success("Desconectado com sucesso!", { description: "Você pode se conectar novamente a qualquer momento." });
+        await loadIntegrations(); // Recarrega o estado das integrações
+    } catch (error: any) {
+        toast.error('Erro ao desconectar do Mercado Livre', { description: error.message });
+    } finally {
+        setConnecting(null);
     }
   };
 
@@ -227,9 +246,15 @@ const Integrations = () => {
                         {connecting === 'mercado_livre' ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <LinkIcon className="w-4 h-4 mr-2" />} Conectar
                       </Button>
                     ) : (
-                      <Button onClick={syncQuestions} disabled={connecting === 'sync'} variant="outline">
-                        {connecting === 'sync' ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />} Sincronizar Perguntas
-                      </Button>
+                      <>
+                        <Button onClick={syncQuestions} disabled={connecting === 'sync'} variant="outline">
+                          {connecting === 'sync' ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />} Sincronizar Perguntas
+                        </Button>
+                        {/* BOTÃO DE DESCONECTAR ADICIONADO */}
+                        <Button onClick={disconnectMercadoLivre} disabled={connecting === 'disconnect_ml'} variant="destructive">
+                          {connecting === 'disconnect_ml' ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Unplug className="w-4 h-4 mr-2" />} Desconectar
+                        </Button>
+                      </>
                     )}
                   </div>
                 </div>
