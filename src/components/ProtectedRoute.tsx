@@ -26,26 +26,9 @@ const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRouteProps)
   }
 
   if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-        <Card className="w-full max-w-md shadow-lg border-0">
-          <CardHeader className="text-center bg-gradient-to-r from-blue-50 to-indigo-50 rounded-t-lg">
-            <AlertCircle className="w-12 h-12 text-blue-500 mx-auto mb-4" />
-            <CardTitle className="text-xl text-gray-900">Acesso Necessário</CardTitle>
-          </CardHeader>
-          <CardContent className="text-center space-y-4 p-6">
-            <p className="text-gray-600">
-              Você precisa estar logado para acessar esta página.
-            </p>
-            <Link to="/auth">
-              <Button className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
-                Fazer Login
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    // Se não houver usuário, redireciona programaticamente para a página de login.
+    // O 'replace' evita que o usuário possa "voltar" para a página protegida.
+    return <Navigate to="/auth" replace />;
   }
 
   if (requireAdmin && !isAdmin) {

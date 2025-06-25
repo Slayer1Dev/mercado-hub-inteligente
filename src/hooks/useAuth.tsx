@@ -5,7 +5,6 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-// Interfaces...
 interface UserProfile {
   id: string;
   email: string;
@@ -29,15 +28,6 @@ export const useAuth = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const updateOnlineStatus = useCallback(async (isOnline: boolean, userId?: string) => {
-    if (!userId) return;
-    try {
-      await supabase.rpc('update_user_online_status', { user_id: userId, is_online: isOnline });
-    } catch (error) {
-      console.error('Falha ao atualizar status online:', error);
-    }
-  }, []);
-
   const loadUserData = useCallback(async (userId: string) => {
     try {
       const [profileResponse, subscriptionResponse, isAdminResponse] = await Promise.all([
@@ -45,8 +35,7 @@ export const useAuth = () => {
         supabase.from('user_subscriptions').select('plan_type, plan_status, expires_at').eq('user_id', userId).single(),
         supabase.rpc('is_current_user_admin')
       ]);
-      
-      // Não jogue erros aqui, apenas logue para não quebrar a UI
+
       if (profileResponse.error) console.error("Erro ao buscar perfil:", profileResponse.error.message);
       if (subscriptionResponse.error) console.error("Erro ao buscar assinatura:", subscriptionResponse.error.message);
       if (isAdminResponse.error) console.error("Erro ao verificar admin:", isAdminResponse.error.message);
@@ -56,62 +45,54 @@ export const useAuth = () => {
       setIsAdmin(isAdminResponse.data || false);
     } catch (error) {
       console.error('Falha crítica ao carregar dados do usuário:', error);
+      toast.error("Erro ao carregar dados da conta.");
     }
   }, []);
-  
+
   useEffect(() => {
-    // Inicia o carregamento
     setLoading(true);
+    let isMounted = true;
 
-    // Pega a sessão inicial para carregar a UI rapidamente
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        await loadUserData(session.user.id);
-        await updateOnlineStatus(true, session.user.id);
-      }
-      // Finaliza o carregamento inicial
-      setLoading(false);
-    });
+    const { data: { subscription: authListener } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!isMounted) return;
 
-    // Escuta por futuras mudanças de autenticação (login/logout)
-    const { data: { subscription: authListener } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      try {
+        const currentUser = session?.user;
+        setUser(currentUser ?? null);
         setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          setLoading(true); // Mostra loading ao revalidar
-          await loadUserData(session.user.id);
-          await updateOnlineStatus(true, session.user.id);
-          setLoading(false);
+
+        if (currentUser) {
+          await loadUserData(currentUser.id);
         } else {
-          // Limpa o estado se o usuário fizer logout
           setProfile(null);
           setSubscription(null);
           setIsAdmin(false);
         }
+      } catch (e) {
+        console.error("Erro no handler onAuthStateChange:", e);
+        toast.error("Ocorreu um erro ao verificar sua sessão.");
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
-    );
+    });
 
     return () => {
+      isMounted = false;
       authListener?.unsubscribe();
     };
-  }, [loadUserData, updateOnlineStatus]);
+  }, [loadUserData]);
 
   const signIn = (email: string, password: string) => supabase.auth.signInWithPassword({ email, password });
   
   const signUp = (email: string, password: string, name?: string) => supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/`,
-        data: name ? { name } : undefined,
-      },
-    });
+    email,
+    password,
+    options: { emailRedirectTo: `${window.location.origin}/`, data: name ? { name } : undefined },
+  });
 
   const signOut = async () => {
-    if(user) await updateOnlineStatus(false, user.id);
     await supabase.auth.signOut();
   };
   
