@@ -10,84 +10,42 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Trata a requisição de pre-flight do CORS
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SERVICE_ROLE_KEY')!);
+
   try {
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SERVICE_ROLE_KEY')!
-    );
+    const { data: { user } } = await supabase.auth.getUser((req.headers.get('Authorization')!).replace('Bearer ', ''));
+    if (!user) throw new Error('Usuário não autenticado');
 
-    // 1. Valida o corpo da requisição
     const { item_id, status } = await req.json();
-    if (!item_id || typeof item_id !== 'string') {
-      throw new Error('O "item_id" é obrigatório e deve ser uma string.');
-    }
-    if (!['active', 'paused'].includes(status)) {
-      throw new Error('O "status" é obrigatório e deve ser "active" ou "paused".');
+    if (!item_id || !status || !['active', 'paused'].includes(status)) {
+      throw new Error('Parâmetros inválidos: item_id e status ("active" ou "paused") são necessários.');
     }
 
-    // 2. Autentica o usuário que está fazendo a chamada
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-        throw new Error("Token de autorização ausente.");
-    }
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
-    if (userError || !user) {
-        throw new Error("Usuário não autenticado ou token inválido.");
-    }
+    const accessToken = await getValidAccessToken(supabase, user.id);
 
-    // 3. Obtém um token de acesso válido para a API do Mercado Livre
-    const accessToken = await getValidAccessToken(supabaseAdmin, user.id);
-
-    // 4. Monta a requisição para a API do Mercado Livre
     const mlResponse = await fetch(`https://api.mercadolibre.com/items/${item_id}`, {
       method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
+      headers: { 
+        'Authorization': `Bearer ${accessToken}`, 
+        'Content-Type': 'application/json' 
       },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status: status }),
     });
 
-    if (!mlResponse.ok) {
-      const errorBody = await mlResponse.json();
-      console.error(`Erro na API do ML para o item ${item_id}:`, errorBody);
-      // Lança um erro com a mensagem vinda diretamente do Mercado Livre
-      throw new Error(errorBody.message || 'Erro desconhecido ao atualizar o item no Mercado Livre.');
+    if(!mlResponse.ok) {
+        const errorBody = await mlResponse.json();
+        throw new Error(`Erro da API do ML: ${JSON.stringify(errorBody)}`);
     }
 
-    // 5. Atualiza o status do produto no seu próprio banco de dados para manter a consistência
-    const { error: dbError } = await supabaseAdmin
-      .from('products')
-      .update({ status, updated_at: new Date().toISOString() }) // Assumindo que você tenha uma coluna 'updated_at'
-      .eq('ml_item_id', item_id)
-      .eq('user_id', user.id);
+    const successMessage = `Anúncio ${status === 'active' ? 'ativado' : 'pausado'}.`;
+    await createLog(supabase, user.id, 'update_status', 'success', successMessage, { item_id });
 
-    if (dbError) {
-      // Loga o erro mas não impede a resposta de sucesso, pois a ação no ML funcionou
-      await createLog(supabaseAdmin, user.id, 'update_status_db_sync', 'error', `Falha ao sincronizar status do item ${item_id} no banco local.`, { error: dbError.message });
-    }
-    
-    // 6. Loga o sucesso da operação e retorna a resposta
-    const successMessage = `Status do item ${item_id} atualizado para ${status}.`;
-    await createLog(supabaseAdmin, user.id, 'update_status', 'success', successMessage, { item_id, status });
-    
-    return new Response(JSON.stringify({ message: successMessage }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    });
-
-  } catch (error) {
-    console.error("Erro na função update-ml-status:", error.message);
-    // Retorna uma resposta de erro com a mensagem específica da falha
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 400, // Usa 400 para erros de cliente/requisição
-    });
+    return new Response(JSON.stringify({ success: true, message: successMessage }), { headers: corsHeaders });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
   }
 });
