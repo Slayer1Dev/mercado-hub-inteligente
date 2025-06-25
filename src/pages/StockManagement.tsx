@@ -343,6 +343,7 @@ const StockManagement = () => {
   
 // --- COMPONENTES FILHOS ---
 
+// Componente para a tela de detalhes de um grupo
 const GroupDetailView = ({ group, onBack, onGroupUpdate }: { group: GroupDetail; onBack: () => void; onGroupUpdate: () => void }) => {
   const [masterStock, setMasterStock] = useState<string>("");
   const [isSavingStock, setIsSavingStock] = useState(false);
