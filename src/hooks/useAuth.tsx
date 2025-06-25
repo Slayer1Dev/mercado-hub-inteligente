@@ -1,8 +1,9 @@
 // src/hooks/useAuth.tsx
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface UserProfile {
   id: string;
@@ -27,26 +28,46 @@ export const useAuth = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const loadAuthData = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          await loadUserData(session.user.id);
-          await updateOnlineStatus(true);
-        }
-        setLoading(false);
-    };
-    
-    loadAuthData();
+  const loadUserData = useCallback(async (userId: string) => {
+    try {
+        const [profileResponse, subscriptionResponse, isAdminResponse] = await Promise.all([
+            supabase.from('profiles').select('*').eq('id', userId).single(),
+            supabase.from('user_subscriptions').select('plan_type, plan_status, expires_at').eq('user_id', userId).single(),
+            supabase.rpc('is_current_user_admin')
+        ]);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        if (profileResponse.error) console.error("Erro ao buscar perfil:", profileResponse.error.message);
+        if (subscriptionResponse.error) console.error("Erro ao buscar assinatura:", subscriptionResponse.error.message);
+        if (isAdminResponse.error) console.error("Erro ao verificar admin:", isAdminResponse.error.message);
+
+        setProfile(profileResponse.data);
+        setSubscription(subscriptionResponse.data);
+        setIsAdmin(isAdminResponse.data || false);
+    } catch (error) {
+        console.error('Falha crítica ao carregar dados do usuário:', error);
+        toast.error("Erro crítico", { description: "Não foi possível carregar os dados da sua conta. Tente recarregar a página." });
+    }
+  }, []);
+
+  const updateOnlineStatus = useCallback(async (isOnline: boolean) => {
+    if (!supabase.auth.getSession()) return;
+    try {
+      await supabase.rpc('update_user_online_status', { is_online: isOnline });
+    } catch (error) {
+      // Silencioso para não incomodar o usuário
+      console.error('Falha ao atualizar status online:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    const { data: { subscription: authListener } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        await loadUserData(session.user.id);
+      const currentUser = session?.user;
+      setUser(currentUser ?? null);
+
+      if (currentUser) {
+        await loadUserData(currentUser.id);
         await updateOnlineStatus(true);
       } else {
         setProfile(null);
@@ -55,44 +76,27 @@ export const useAuth = () => {
       }
       setLoading(false);
     });
+    
+    // Adiciona um listener para quando a aba do navegador fica visível
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        updateOnlineStatus(true);
+      } else {
+        updateOnlineStatus(false);
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const loadUserData = async (userId: string) => {
-    try {
-      // Carrega perfil e assinatura em paralelo
-      const [profileResponse, subscriptionResponse, isAdminResponse] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', userId).single(),
-        supabase.from('user_subscriptions').select('plan_type, plan_status, expires_at').eq('user_id', userId).single(),
-        // --- CORREÇÃO APLICADA AQUI ---
-        // Usando a nova função RPC para verificar se é admin
-        supabase.rpc('is_current_user_admin')
-      ]);
-
-      if (profileResponse.data) setProfile(profileResponse.data);
-      if (subscriptionResponse.data) setSubscription(subscriptionResponse.data);
-      
-      // Define o status de admin com base na resposta da função RPC
-      setIsAdmin(isAdminResponse.data || false);
-      
-      // Trata os erros, se houver
-      if (profileResponse.error) throw profileResponse.error;
-      if (subscriptionResponse.error) throw subscriptionResponse.error;
-      if (isAdminResponse.error) throw isAdminResponse.error;
-
-    } catch (error) {
-      console.error('Erro ao carregar dados do usuário:', error);
-    }
-  };
-
-  const updateOnlineStatus = async (isOnline: boolean) => {
-    try {
-      await supabase.rpc('update_user_online_status', { is_online: isOnline });
-    } catch (error) {
-      console.error('Erro ao atualizar status online:', error);
-    }
-  };
+    return () => {
+      authListener.unsubscribe();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      // Garante que o usuário seja marcado como offline ao fechar
+      if (user) {
+         updateOnlineStatus(false);
+      }
+    };
+  }, [loadUserData, updateOnlineStatus, user]);
 
   const signIn = (email: string, password: string) => supabase.auth.signInWithPassword({ email, password });
   
@@ -110,22 +114,7 @@ export const useAuth = () => {
     return supabase.auth.signOut();
   };
   
-  const hasAccess = () => {
-    if (isAdmin) return true;
-    if (!subscription) return false;
-    if (subscription.plan_status === 'active') {
-      return !subscription.expires_at || new Date(subscription.expires_at) > new Date();
-    }
-    return false;
-  };
-
-  useEffect(() => {
-    return () => {
-      if (user) {
-        updateOnlineStatus(false);
-      }
-    };
-  }, [user]);
+  const hasAccess = isAdmin || (subscription?.plan_status === 'active' && (!subscription.expires_at || new Date(subscription.expires_at) > new Date()));
 
   return {
     user,
@@ -134,10 +123,9 @@ export const useAuth = () => {
     subscription,
     isAdmin,
     loading,
-    hasAccess: hasAccess(),
+    hasAccess,
     signIn,
     signUp,
     signOut,
-    updateOnlineStatus,
   };
 };
