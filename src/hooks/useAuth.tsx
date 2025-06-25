@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 
+// Interfaces permanecem as mesmas
 interface UserProfile {
   id: string;
   email: string;
@@ -21,77 +21,65 @@ interface UserSubscription {
 }
 
 export const useAuth = () => {
-  const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  const loadUserData = useCallback(async (userId: string) => {
-    try {
-      const [profileResponse, subscriptionResponse, isAdminResponse] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', userId).single(),
-        supabase.from('user_subscriptions').select('plan_type, plan_status, expires_at').eq('user_id', userId).single(),
-        supabase.rpc('is_current_user_admin')
-      ]);
-
-      if (profileResponse.error) console.error("Erro ao buscar perfil:", profileResponse.error.message);
-      if (subscriptionResponse.error) console.error("Erro ao buscar assinatura:", subscriptionResponse.error.message);
-      if (isAdminResponse.error) console.error("Erro ao verificar admin:", isAdminResponse.error.message);
-
-      setProfile(profileResponse.data);
-      setSubscription(subscriptionResponse.data);
-      setIsAdmin(isAdminResponse.data || false);
-    } catch (error) {
-      console.error('Falha crítica ao carregar dados do usuário:', error);
-      toast.error("Erro ao carregar dados da conta.");
-    }
-  }, []);
+  const [loading, setLoading] = useState(true); // Começa como true
 
   useEffect(() => {
-    setLoading(true);
-    let isMounted = true;
-
-    const { data: { subscription: authListener } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!isMounted) return;
-
-      try {
+    // Esta é a única fonte de verdade para autenticação.
+    // Ele lida com o estado inicial e quaisquer mudanças futuras.
+    const { data: { subscription: authListener } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        setSession(session);
         const currentUser = session?.user;
         setUser(currentUser ?? null);
-        setSession(session);
 
+        // Se houver um usuário, busca seus dados.
         if (currentUser) {
-          await loadUserData(currentUser.id);
+          try {
+            const [profileRes, subRes, adminRes] = await Promise.all([
+              supabase.from('profiles').select('*').eq('id', currentUser.id).single(),
+              supabase.from('user_subscriptions').select('*').eq('user_id', currentUser.id).single(),
+              supabase.rpc('is_current_user_admin')
+            ]);
+
+            setProfile(profileRes.data);
+            setSubscription(subRes.data);
+            setIsAdmin(adminRes.data || false);
+          } catch (error) {
+            console.error("Erro ao carregar dados do usuário:", error);
+            // Limpa o estado em caso de falha para evitar dados inconsistentes
+            setProfile(null);
+            setSubscription(null);
+            setIsAdmin(false);
+          }
         } else {
+          // Se não houver sessão, limpa tudo.
           setProfile(null);
           setSubscription(null);
           setIsAdmin(false);
         }
-      } catch (e) {
-        console.error("Erro no handler onAuthStateChange:", e);
-        toast.error("Ocorreu um erro ao verificar sua sessão.");
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+        
+        // Garante que o estado de carregamento seja desativado após a verificação inicial.
+        setLoading(false);
       }
-    });
+    );
 
+    // Função de limpeza para remover o listener quando o componente desmontar
     return () => {
-      isMounted = false;
-      authListener?.unsubscribe();
+      authListener.unsubscribe();
     };
-  }, [loadUserData]);
+  }, []);
 
   const signIn = (email: string, password: string) => supabase.auth.signInWithPassword({ email, password });
-  
   const signUp = (email: string, password: string, name?: string) => supabase.auth.signUp({
     email,
     password,
-    options: { emailRedirectTo: `${window.location.origin}/`, data: name ? { name } : undefined },
+    options: { emailRedirectTo: `${window.location.origin}/`, data: { name } },
   });
-
   const signOut = async () => {
     await supabase.auth.signOut();
   };

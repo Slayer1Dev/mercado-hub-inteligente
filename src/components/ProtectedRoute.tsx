@@ -1,10 +1,11 @@
+// src/components/ProtectedRoute.tsx
 
 import { ReactNode } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { Navigate, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Link } from 'react-router-dom';
-import { AlertCircle, Phone, Mail, User } from 'lucide-react';
+import { AlertCircle, Loader2, Phone, Mail, User } from 'lucide-react';
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -14,23 +15,21 @@ interface ProtectedRouteProps {
 const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRouteProps) => {
   const { user, loading, hasAccess, isAdmin, subscription } = useAuth();
 
+  // 1. Estado de Carregamento: Mostra um spinner enquanto a sessão está sendo verificada.
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Carregando...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Loader2 className="h-12 w-12 animate-spin text-blue-600" />
       </div>
     );
   }
 
+  // 2. Não Autenticado: Redireciona para a página de login.
   if (!user) {
-    // Se não houver usuário, redireciona programaticamente para a página de login.
-    // O 'replace' evita que o usuário possa "voltar" para a página protegida.
     return <Navigate to="/auth" replace />;
   }
 
+  // 3. Acesso Negado (Área Admin)
   if (requireAdmin && !isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-pink-100 p-4">
@@ -40,9 +39,7 @@ const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRouteProps)
             <CardTitle className="text-xl text-gray-900">Acesso Negado</CardTitle>
           </CardHeader>
           <CardContent className="text-center space-y-4 p-6">
-            <p className="text-gray-600">
-              Você não tem permissão para acessar esta área administrativa.
-            </p>
+            <p className="text-gray-600">Você não tem permissão para acessar esta área.</p>
             <Link to="/dashboard">
               <Button variant="outline" className="w-full">Voltar ao Dashboard</Button>
             </Link>
@@ -52,9 +49,10 @@ const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRouteProps)
     );
   }
 
+  // 4. Acesso Suspenso (Plano inativo/expirado)
   if (!requireAdmin && !hasAccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-yellow-100 p-4">
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-yellow-100 p-4">
         <Card className="w-full max-w-lg shadow-lg border-0">
           <CardHeader className="text-center bg-gradient-to-r from-orange-50 to-yellow-50 rounded-t-lg">
             <AlertCircle className="w-12 h-12 text-orange-500 mx-auto mb-4" />
@@ -113,6 +111,7 @@ const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRouteProps)
     );
   }
 
+  // 5. Acesso Permitido: Renderiza a página solicitada.
   return <>{children}</>;
 };
 
