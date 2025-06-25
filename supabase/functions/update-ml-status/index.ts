@@ -14,37 +14,36 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SERVICE_ROLE_KEY')!);
-
   try {
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SERVICE_ROLE_KEY')!
+    );
+
     const { data: { user } } = await supabase.auth.getUser((req.headers.get('Authorization')!).replace('Bearer ', ''));
     if (!user) throw new Error('Usuário não autenticado');
 
     const { item_id, status } = await req.json();
-    if (!item_id || !status || !['active', 'paused'].includes(status)) {
-      throw new Error('Parâmetros inválidos: item_id e status ("active" ou "paused") são necessários.');
+    if (!item_id || !['active', 'paused'].includes(status)) {
+      throw new Error('Parâmetros inválidos: item_id e status são necessários.');
     }
 
     const accessToken = await getValidAccessToken(supabase, user.id);
 
     const mlResponse = await fetch(`https://api.mercadolibre.com/items/${item_id}`, {
       method: 'PUT',
-      headers: { 
-        'Authorization': `Bearer ${accessToken}`, 
-        'Content-Type': 'application/json' 
-      },
-      body: JSON.stringify({ status: status }),
+      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
     });
 
-    if(!mlResponse.ok) {
-        const errorBody = await mlResponse.json();
-        throw new Error(`Erro da API do ML: ${JSON.stringify(errorBody)}`);
+    if (!mlResponse.ok) {
+      const errorBody = await mlResponse.json();
+      throw new Error(errorBody.message || 'Erro ao atualizar status no Mercado Livre.');
     }
 
-    const successMessage = `Anúncio ${status === 'active' ? 'ativado' : 'pausado'}.`;
-    await createLog(supabase, user.id, 'update_status', 'success', successMessage, { item_id });
+    await createLog(supabase, user.id, 'update_status', 'success', `Status do item ${item_id} atualizado para ${status}.`, { item_id });
+    return new Response(JSON.stringify({ success: true }), { headers: corsHeaders });
 
-    return new Response(JSON.stringify({ success: true, message: successMessage }), { headers: corsHeaders });
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
   }
