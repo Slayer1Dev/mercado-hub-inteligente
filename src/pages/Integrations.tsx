@@ -1,202 +1,328 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createLog, getValidAccessToken } from '../_shared/ml-auth.ts';
+import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
+import { 
+  Link as LinkIcon, 
+  CheckCircle, 
+  XCircle, 
+  Loader2, 
+  ShoppingBag, 
+  Bot,
+  AlertCircle,
+  RefreshCw,
+  Eye
+} from 'lucide-react';
+import { toast } from 'sonner';
+import AppHeader from '@/components/AppHeader';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+interface Integration {
+  id: string;
+  integration_type: string;
+  is_connected: boolean;
+  last_sync: string | null;
+  created_at: string;
+}
+
+interface LogEntry {
+  id: number;
+  integration_type: string;
+  action: string;
+  status: string;
+  message: string;
+  created_at: string;
+  details: any;
+}
+
+const Integrations = () => {
+  const { user } = useAuth();
+  const [integrations, setIntegrations] = useState<Integration[]>([]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [connecting, setConnecting] = useState<string | null>(null);
+  const [showLogs, setShowLogs] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setLoading(true);
+      Promise.all([loadIntegrations(), loadLogs()])
+        .catch(err => console.error("Erro ao carregar dados da página de integrações:", err))
+        .finally(() => setLoading(false));
+    } else if(!user) {
+      setLoading(false);
+    }
+  }, [user]);
+
+  // CORREÇÃO: A função getAuthHeaders foi movida para dentro do componente
+  // para evitar o erro de importação no build.
+  const getAuthHeaders = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      throw new Error('Usuário não autenticado.');
+    }
+    return {
+      Authorization: `Bearer ${session.access_token}`,
+    };
+  };
+
+  const loadIntegrations = async () => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from('user_integrations')
+        .select('*')
+        .eq('user_id', user.id);
+      if (error) throw error;
+      setIntegrations(data || []);
+    } catch (error: any) {
+      toast.error('Erro ao carregar suas integrações.', { description: error.message });
+    }
+  };
+
+  const loadLogs = async () => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from('integration_logs')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      setLogs(data || []);
+    } catch (error: any) {
+      console.error('Erro ao carregar logs:', error.message);
+    }
+  };
+
+  const connectMercadoLivre = async () => {
+    setConnecting('mercado_livre');
+    try {
+      const headers = await getAuthHeaders();
+      const { data, error } = await supabase.functions.invoke('mercado-livre-integration/oauth-start', { headers });
+      if (error) throw error;
+      if (data?.authUrl) {
+        window.location.href = data.authUrl;
+      } else {
+        throw new Error('URL de autorização não recebida');
+      }
+    } catch (error: any) {
+      toast.error('Erro ao conectar com Mercado Livre', { description: error.message });
+      setConnecting(null);
+    }
+  };
+
+  const testGeminiConnection = async () => {
+    setConnecting('gemini');
+    try {
+      const headers = await getAuthHeaders();
+      const { data, error } = await supabase.functions.invoke('gemini-ai/test', { headers });
+      if (error) throw error;
+      if (data?.connected) {
+        toast.success('Conexão com Gemini AI funcionando!');
+        if(user) {
+            await supabase.from('user_integrations').upsert({
+            user_id: user.id,
+            integration_type: 'gemini',
+            is_connected: true,
+            last_sync: new Date().toISOString(),
+          }, { onConflict: 'user_id, integration_type' });
+        }
+        loadIntegrations();
+      } else {
+        toast.error(data?.error || 'Falha na conexão com Gemini AI');
+      }
+    } catch (error: any) {
+      toast.error('Erro ao testar conexão com Gemini AI', { description: error.message });
+    } finally {
+      setConnecting(null);
+    }
+  };
+
+  const syncQuestions = async () => {
+    setConnecting('sync');
+    try {
+      const headers = await getAuthHeaders();
+      const { data, error } = await supabase.functions.invoke('mercado-livre-integration/sync-questions', { headers });
+      if (error) throw error;
+      toast.success(data.message || 'Sincronização iniciada com sucesso!');
+      loadLogs();
+    } catch (error: any) {
+      toast.error('Erro na sincronização de perguntas', { description: error.message });
+    } finally {
+      setConnecting(null);
+    }
+  };
+  
+  const getIntegrationStatus = (type: string) => {
+    const integration = integrations.find(i => i.integration_type === type);
+    return {
+      connected: integration?.is_connected || false,
+      last_sync: integration?.last_sync
+    };
+  };
+
+  const getStatusBadge = (type: string) => {
+    const { connected } = getIntegrationStatus(type);
+    if (connected) {
+      return <Badge variant="default" className="bg-green-100 text-green-800"><CheckCircle className="w-4 h-4 mr-1" /> Conectado</Badge>;
+    }
+    return <Badge variant="destructive"><XCircle className="w-4 h-4 mr-1" /> Desconectado</Badge>;
+  };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col min-h-screen bg-gray-50">
+        <AppHeader />
+        <div className="flex-1 flex items-center justify-center">
+            <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col min-h-screen bg-gray-50">
+      <AppHeader />
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex justify-between items-center mb-8">
+            <div>
+                <h1 className="text-3xl font-bold text-gray-900">Integrações</h1>
+                <p className="text-gray-600">Conecte suas contas e gerencie suas automações.</p>
+            </div>
+        </div>
+
+        <Alert className="mb-8">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Após conectar sua conta do Mercado Livre, lembre-se de sincronizar seus produtos e perguntas para começar a usar as ferramentas.
+          </AlertDescription>
+        </Alert>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          {/* Mercado Livre */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 bg-yellow-400 rounded-lg flex items-center justify-center">
+                      <ShoppingBag className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <CardTitle>Mercado Livre</CardTitle>
+                      {getStatusBadge('mercado_livre')}
+                    </div>
+                  </div>
+                  <Button 
+                    onClick={connectMercadoLivre} 
+                    disabled={connecting === 'mercado_livre'}
+                  >
+                    {connecting === 'mercado_livre' ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                    {getIntegrationStatus('mercado_livre').connected ? 'Reconectar' : 'Conectar'}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-gray-600">
+                  Sincronize produtos, estoque e responda perguntas automaticamente.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Button 
+                    variant="outline" 
+                    className="flex-1"
+                    onClick={async () => {
+                      toast.info("Iniciando sincronização de produtos...");
+                      const headers = await getAuthHeaders();
+                      await supabase.functions.invoke('mercado-livre-integration/sync-products', { headers });
+                    }}
+                    disabled={!getIntegrationStatus('mercado_livre').connected}
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" /> Sincronizar Produtos
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="flex-1"
+                    onClick={syncQuestions} 
+                    disabled={!getIntegrationStatus('mercado_livre').connected || connecting === 'sync'}
+                  >
+                    {connecting === 'sync' ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                    Sincronizar Perguntas
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Gemini AI */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 bg-purple-500 rounded-lg flex items-center justify-center">
+                      <Bot className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <CardTitle>Gemini AI</CardTitle>
+                      {getStatusBadge('gemini')}
+                    </div>
+                  </div>
+                  <Button 
+                    onClick={testGeminiConnection} 
+                    disabled={connecting === 'gemini'}
+                  >
+                    {connecting === 'gemini' ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                    Testar Conexão
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-gray-600">
+                  Configure a chave de API do Google Gemini para habilitar respostas inteligentes. A chave deve ser adicionada como um segredo no Supabase com o nome `GEMINI_API_KEY`.
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+
+        {/* Logs */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">Logs de Integração</h2>
+            <Button variant="outline" onClick={() => setShowLogs(!showLogs)}>
+              <Eye className="w-4 h-4 mr-2" />
+              {showLogs ? 'Ocultar Logs' : 'Mostrar Logs'}
+            </Button>
+          </div>
+          {showLogs && (
+            <Card>
+              <CardContent className="p-4 max-h-96 overflow-y-auto">
+                {logs.length > 0 ? (
+                  <div className="space-y-2">
+                    {logs.map(log => (
+                      <div key={log.id} className="text-xs font-mono p-2 bg-gray-100 rounded flex items-start space-x-2">
+                        <span className="text-gray-500 whitespace-nowrap">{new Date(log.created_at).toLocaleString('pt-BR')}</span>
+                        <span className={`font-bold ${log.status === 'success' ? 'text-green-600' : log.status === 'error' ? 'text-red-600' : 'text-blue-600'}`}>[{log.action.toUpperCase()}]</span>
+                        <span className="flex-1">{log.message}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-center text-gray-500 py-4">Nenhum log encontrado.</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </motion.div>
+      </main>
+    </div>
+  );
 };
 
-// --- Funções Handler para cada Rota ---
+export default Integrations;
 
-async function handleOAuthStart(req: Request, supabase: any, user: any) {
-  await createLog(supabase, user.id, 'oauth_start', 'info', 'Iniciando processo de OAuth.', null);
-
-  const ML_CLIENT_ID = Deno.env.get('ML_CLIENT_ID');
-  if (!ML_CLIENT_ID) {
-    throw new Error('ERRO CRÍTICO: ML_CLIENT_ID não encontrado nos segredos do ambiente.');
-  }
-  
-  const redirectUri = `${Deno.env.get('SUPABASE_URL')}/functions/v1/mercado-livre-integration/oauth-callback`;
-  const scopes = 'read write offline_access';
-  const authUrl = `https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=${ML_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${user.id}&scope=${encodeURIComponent(scopes)}`;
-
-  return new Response(JSON.stringify({ authUrl }), {
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
-
-async function handleOAuthCallback(req: Request, supabase: any) {
-    const url = new URL(req.url);
-    const code = url.searchParams.get('code');
-    const state = url.searchParams.get('state'); // user_id
-  
-    if (!code || !state) {
-      throw new Error('Parâmetros inválidos no callback do Mercado Livre.');
-    }
-  
-    const ML_CLIENT_ID = Deno.env.get('ML_CLIENT_ID');
-    const ML_CLIENT_SECRET = Deno.env.get('ML_CLIENT_SECRET');
-    const redirectUri = `${Deno.env.get('SUPABASE_URL')}/functions/v1/mercado-livre-integration/oauth-callback`;
-  
-    const body = `grant_type=authorization_code&client_id=${ML_CLIENT_ID}&client_secret=${ML_CLIENT_SECRET}&code=${code}&redirect_uri=${redirectUri}`;
-  
-    const tokenResponse = await fetch('https://api.mercadolibre.com/oauth/token', {
-      method: 'POST',
-      headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: body,
-    });
-  
-    if (!tokenResponse.ok) {
-      const errorData = await tokenResponse.text();
-      await createLog(supabase, state, 'oauth_callback', 'error', 'Falha ao obter tokens do ML.', { error: errorData });
-      throw new Error('Falha na autenticação com o Mercado Livre.');
-    }
-  
-    const tokens = await tokenResponse.json();
-    
-    await supabase.from('user_integrations').upsert({
-        user_id: state,
-        integration_type: 'mercado_livre',
-        is_connected: true,
-        credentials: {
-          access_token: tokens.access_token,
-          refresh_token: tokens.refresh_token,
-          ml_user_id: tokens.user_id,
-          expires_in: tokens.expires_in,
-          token_type: tokens.token_type,
-        },
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'user_id, integration_type' });
-  
-    await createLog(supabase, state, 'oauth_callback', 'success', 'Integração com Mercado Livre conectada com sucesso.', null);
-  
-    const SITE_URL = Deno.env.get('SITE_URL') || 'http://localhost:5173';
-    return Response.redirect(`${SITE_URL}/integrations?connected=mercado_livre`);
-}
-
-async function handleSyncProducts(req: Request, supabase: any, user: any) {
-    await createLog(supabase, user.id, 'sync_products', 'info', 'Iniciando sincronização completa de produtos.', null);
-
-    const accessToken = await getValidAccessToken(supabase, user.id);
-    const { data: integrationData } = await supabase
-      .from('user_integrations')
-      .select('credentials->>ml_user_id')
-      .eq('user_id', user.id)
-      .eq('integration_type', 'mercado_livre')
-      .single();
-
-    const mlUserId = integrationData?.ml_user_id;
-    if (!mlUserId) throw new Error("ID de usuário do Mercado Livre não encontrado.");
-
-    let allItemIds: string[] = [];
-    let offset = 0;
-    const limit = 50;
-
-    while (true) {
-      const itemsResponse = await fetch(`https://api.mercadolibre.com/users/${mlUserId}/items/search?limit=${limit}&offset=${offset}`, {
-        headers: { 'Authorization': `Bearer ${accessToken}` }
-      });
-      if (!itemsResponse.ok) throw new Error(`Falha ao buscar lista de itens do ML na página com offset ${offset}.`);
-      
-      const itemsData = await itemsResponse.json();
-      const newIds = itemsData.results || [];
-      allItemIds.push(...newIds);
-
-      if (newIds.length < limit) break;
-      offset += limit;
-    }
-
-    if (allItemIds.length === 0) {
-      return new Response(JSON.stringify({ message: 'Nenhum produto encontrado para sincronizar.' }), { headers: corsHeaders });
-    }
-    
-    const allProductsDetails = [];
-    const batchSize = 20;
-
-    for (let i = 0; i < allItemIds.length; i += batchSize) {
-      const batchIds = allItemIds.slice(i, i + batchSize);
-      const detailsResponse = await fetch(`https://api.mercadolibre.com/items?ids=${batchIds.join(',')}&attributes=id,title,price,available_quantity,status,permalink,thumbnail,attributes`, {
-        headers: { 'Authorization': `Bearer ${accessToken}` }
-      });
-      if (!detailsResponse.ok) {
-        await createLog(supabase, user.id, 'sync_products', 'warning', `Falha ao buscar detalhes de um lote de itens.`, { batchIds });
-        continue;
-      }
-      
-      const detailsData = await detailsResponse.json();
-      allProductsDetails.push(...detailsData.filter((item: any) => item.code === 200).map((item: any) => item.body));
-    }
-    
-    const productsToUpsert = allProductsDetails.map((item: any) => {
-      const eanAttribute = item.attributes.find((attr: any) => attr.id === 'EAN');
-      return {
-          user_id: user.id,
-          ml_item_id: item.id,
-          title: item.title,
-          price: item.price,
-          stock_quantity: item.available_quantity,
-          status: item.status,
-          permalink: item.permalink,
-          thumbnail: item.thumbnail,
-          ean: eanAttribute ? eanAttribute.value_name : null,
-          last_synced_at: new Date().toISOString(),
-      };
-    });
-    
-    if (productsToUpsert.length > 0) {
-        const { error: upsertError } = await supabase.from('products').upsert(productsToUpsert, { onConflict: 'user_id, ml_item_id' });
-        if (upsertError) throw new Error(`Erro ao salvar produtos no banco de dados: ${upsertError.message}`);
-    }
-
-    const successMessage = `${productsToUpsert.length} de ${allItemIds.length} produtos sincronizados com sucesso.`;
-    await createLog(supabase, user.id, 'sync_products', 'success', successMessage, { count: productsToUpsert.length });
-
-    return new Response(JSON.stringify({ message: successMessage }), { headers: corsHeaders });
-}
-
-
-// --- Servidor Principal ---
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
-
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SERVICE_ROLE_KEY')!
-  );
-
-  const url = new URL(req.url);
-  const { pathname } = url;
-  
-  try {
-    // Rotas públicas
-    if (pathname.includes('/oauth-callback')) {
-      return await handleOAuthCallback(req, supabase);
-    }
-
-    // A partir daqui, rotas protegidas
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('Token de autorização ausente');
-    }
-    
-    const { data: { user }, error: userError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
-    if (userError || !user) {
-      throw new Error('Usuário não autenticado');
-    }
-
-    // Roteamento
-    if (pathname.includes('/oauth-start')) {
-      return await handleOAuthStart(req, supabase, user);
-    }
-    if (pathname.includes('/sync-products')) {
-      return await handleSyncProducts(req, supabase, user);
-    }
-    
-    return new Response(JSON.stringify({ error: "Rota não encontrada" }), { status: 404, headers: corsHeaders });
-  } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
-  }
-});
