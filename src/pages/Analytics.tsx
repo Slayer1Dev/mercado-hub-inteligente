@@ -1,37 +1,17 @@
+// src/pages/Analytics.tsx
 
 import { motion } from "framer-motion";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { UserButton } from "@clerk/clerk-react";
 import { Link } from "react-router-dom";
-import { BarChart3, TrendingUp, DollarSign, Users, ArrowLeft, Calendar } from "lucide-react";
+import { BarChart3, TrendingUp, DollarSign, Users, Calendar } from "lucide-react";
+import AppHeader from "@/components/AppHeader"; // Importado o header padrão
 
 const Analytics = () => {
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-4">
-              <Link to="/dashboard">
-                <Button variant="ghost" size="sm">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Voltar
-                </Button>
-              </Link>
-              <div className="flex items-center space-x-2">
-                <BarChart3 className="w-8 h-8 text-green-600" />
-                <span className="text-xl font-bold text-gradient">Analytics</span>
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              <UserButton />
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Header padronizado que já contém o menu do usuário */}
+      <AppHeader />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Section */}
@@ -118,7 +98,6 @@ const Analytics = () => {
 
         {/* Charts and Reports */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Sales Chart */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -146,7 +125,6 @@ const Analytics = () => {
             </Card>
           </motion.div>
 
-          {/* Top Products */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -179,7 +157,6 @@ const Analytics = () => {
                     </div>
                   ))}
                 </div>
-                
                 <Button variant="outline" className="w-full mt-4" disabled>
                   Ver Relatório Completo
                 </Button>
@@ -187,50 +164,6 @@ const Analytics = () => {
             </Card>
           </motion.div>
         </div>
-
-        {/* Performance Insights */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.7 }}
-          className="mt-8"
-        >
-          <Card>
-            <CardHeader>
-              <CardTitle>Insights de Performance</CardTitle>
-              <CardDescription>
-                Análises automáticas para melhorar seus resultados
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                  <TrendingUp className="w-8 h-8 text-green-600 mb-2" />
-                  <h4 className="font-medium text-green-800 mb-1">Crescimento Positivo</h4>
-                  <p className="text-sm text-green-700">
-                    Suas vendas cresceram 12% este mês comparado ao anterior.
-                  </p>
-                </div>
-                
-                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <Users className="w-8 h-8 text-blue-600 mb-2" />
-                  <h4 className="font-medium text-blue-800 mb-1">Novos Clientes</h4>
-                  <p className="text-sm text-blue-700">
-                    76% dos seus clientes este mês foram novos compradores.
-                  </p>
-                </div>
-                
-                <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-                  <DollarSign className="w-8 h-8 text-orange-600 mb-2" />
-                  <h4 className="font-medium text-orange-800 mb-1">Oportunidade</h4>
-                  <p className="text-sm text-orange-700">
-                    Produtos de acessórios têm maior margem de lucro.
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
       </div>
     </div>
   );
