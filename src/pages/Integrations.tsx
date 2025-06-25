@@ -6,12 +6,12 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { 
-  Link as LinkIcon, 
-  CheckCircle, 
-  XCircle, 
-  Loader2, 
-  ShoppingBag, 
+import {
+  Link as LinkIcon,
+  CheckCircle,
+  XCircle,
+  Loader2,
+  ShoppingBag,
   Bot,
   AlertCircle,
   RefreshCw,
@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import AppHeader from '@/components/AppHeader';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface Integration {
   id: string;
@@ -46,19 +47,19 @@ const Integrations = () => {
   const [connecting, setConnecting] = useState<string | null>(null);
   const [showLogs, setShowLogs] = useState(false);
 
+  // CORREÇÃO: Usando Promise.all para um carregamento robusto
   useEffect(() => {
     if (user) {
       setLoading(true);
       Promise.all([loadIntegrations(), loadLogs()])
         .catch(err => console.error("Erro ao carregar dados da página de integrações:", err))
         .finally(() => setLoading(false));
-    } else if(!user) {
+    } else {
+      // Se não há usuário (ou ao fazer logout), para de carregar
       setLoading(false);
     }
   }, [user]);
 
-  // CORREÇÃO: A função getAuthHeaders foi movida para dentro do componente
-  // para evitar o erro de importação no build.
   const getAuthHeaders = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) {
@@ -125,7 +126,7 @@ const Integrations = () => {
       if (data?.connected) {
         toast.success('Conexão com Gemini AI funcionando!');
         if(user) {
-            await supabase.from('user_integrations').upsert({
+          await supabase.from('user_integrations').upsert({
             user_id: user.id,
             integration_type: 'gemini',
             is_connected: true,
@@ -157,21 +158,30 @@ const Integrations = () => {
       setConnecting(null);
     }
   };
-  
+
   const getIntegrationStatus = (type: string) => {
-    const integration = integrations.find(i => i.integration_type === type);
-    return {
-      connected: integration?.is_connected || false,
-      last_sync: integration?.last_sync
-    };
+    return integrations.find(i => i.integration_type === type)?.is_connected || false;
   };
 
-  const getStatusBadge = (type: string) => {
-    const { connected } = getIntegrationStatus(type);
-    if (connected) {
-      return <Badge variant="default" className="bg-green-100 text-green-800"><CheckCircle className="w-4 h-4 mr-1" /> Conectado</Badge>;
+  const getStatusBadge = (connected: boolean) => (
+    connected ? (
+      <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">
+        <CheckCircle className="w-3 h-3 mr-1" /> Conectado
+      </Badge>
+    ) : (
+      <Badge variant="secondary" className="bg-red-100 text-red-800 border-red-200">
+        <XCircle className="w-3 h-3 mr-1" /> Desconectado
+      </Badge>
+    )
+  );
+
+  const getLogStatusClasses = (status: string) => {
+    switch (status) {
+      case 'success': return { dot: 'bg-green-500', text: 'text-green-600' };
+      case 'error': return { dot: 'bg-red-500', text: 'text-red-600' };
+      case 'warning': return { dot: 'bg-yellow-500', text: 'text-yellow-600' };
+      default: return { dot: 'bg-blue-500', text: 'text-blue-600' };
     }
-    return <Badge variant="destructive"><XCircle className="w-4 h-4 mr-1" /> Desconectado</Badge>;
   };
 
   if (loading) {
@@ -179,7 +189,7 @@ const Integrations = () => {
       <div className="flex flex-col min-h-screen bg-gray-50">
         <AppHeader />
         <div className="flex-1 flex items-center justify-center">
-            <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+          <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
         </div>
       </div>
     );
@@ -189,135 +199,125 @@ const Integrations = () => {
     <div className="flex flex-col min-h-screen bg-gray-50">
       <AppHeader />
       <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex justify-between items-center mb-8">
-            <div>
-                <h1 className="text-3xl font-bold text-gray-900">Integrações</h1>
-                <p className="text-gray-600">Conecte suas contas e gerencie suas automações.</p>
-            </div>
-        </div>
-
-        <Alert className="mb-8">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            Após conectar sua conta do Mercado Livre, lembre-se de sincronizar seus produtos e perguntas para começar a usar as ferramentas.
-          </AlertDescription>
-        </Alert>
-
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Integrações</h1>
+          <p className="text-gray-600">Conecte suas contas e configure as integrações para automatizar seu negócio</p>
+        </motion.div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          {/* Mercado Livre */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <Card>
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-yellow-400 rounded-lg flex items-center justify-center">
-                      <ShoppingBag className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <CardTitle>Mercado Livre</CardTitle>
-                      {getStatusBadge('mercado_livre')}
-                    </div>
-                  </div>
-                  <Button 
-                    onClick={connectMercadoLivre} 
-                    disabled={connecting === 'mercado_livre'}
-                  >
-                    {connecting === 'mercado_livre' ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                    {getIntegrationStatus('mercado_livre').connected ? 'Reconectar' : 'Conectar'}
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm text-gray-600">
-                  Sincronize produtos, estoque e responda perguntas automaticamente.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <Button 
-                    variant="outline" 
-                    className="flex-1"
-                    onClick={async () => {
-                      toast.info("Iniciando sincronização de produtos...");
-                      const headers = await getAuthHeaders();
-                      await supabase.functions.invoke('mercado-livre-integration/sync-products', { headers });
-                    }}
-                    disabled={!getIntegrationStatus('mercado_livre').connected}
-                  >
-                    <RefreshCw className="w-4 h-4 mr-2" /> Sincronizar Produtos
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    className="flex-1"
-                    onClick={syncQuestions} 
-                    disabled={!getIntegrationStatus('mercado_livre').connected || connecting === 'sync'}
-                  >
-                    {connecting === 'sync' ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-                    Sincronizar Perguntas
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Gemini AI */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-            <Card>
+            <Card className="border-0 shadow-sm">
               <CardHeader>
-                <div className="flex justify-between items-start">
+                <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-purple-500 rounded-lg flex items-center justify-center">
-                      <Bot className="w-6 h-6 text-white" />
-                    </div>
+                    <div className="p-2 bg-yellow-100 rounded-lg"><ShoppingBag className="w-6 h-6 text-yellow-600" /></div>
                     <div>
-                      <CardTitle>Gemini AI</CardTitle>
-                      {getStatusBadge('gemini')}
+                      <CardTitle className="text-lg">Mercado Livre</CardTitle>
+                      <p className="text-sm text-gray-600">Sincronize perguntas automaticamente</p>
                     </div>
                   </div>
-                  <Button 
-                    onClick={testGeminiConnection} 
-                    disabled={connecting === 'gemini'}
-                  >
-                    {connecting === 'gemini' ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                    Testar Conexão
-                  </Button>
+                  {getStatusBadge(getIntegrationStatus('mercado_livre'))}
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-gray-600">
-                  Configure a chave de API do Google Gemini para habilitar respostas inteligentes. A chave deve ser adicionada como um segredo no Supabase com o nome `GEMINI_API_KEY`.
-                </p>
+                <div className="space-y-3">
+                  <div className="text-sm text-gray-600">Conecte sua conta do Mercado Livre para receber e responder perguntas automaticamente com IA.</div>
+                  <div className="flex space-x-2">
+                    {!getIntegrationStatus('mercado_livre') ? (
+                      <Button onClick={connectMercadoLivre} disabled={connecting === 'mercado_livre'} className="bg-yellow-600 hover:bg-yellow-700">
+                        {connecting === 'mercado_livre' ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <LinkIcon className="w-4 h-4 mr-2" />} Conectar
+                      </Button>
+                    ) : (
+                      <Button onClick={syncQuestions} disabled={connecting === 'sync'} variant="outline">
+                        {connecting === 'sync' ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />} Sincronizar Perguntas
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+            <Card className="border-0 shadow-sm">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-purple-100 rounded-lg"><Bot className="w-6 h-6 text-purple-600" /></div>
+                    <div>
+                      <CardTitle className="text-lg">Gemini AI</CardTitle>
+                      <p className="text-sm text-gray-600">Respostas inteligentes automáticas</p>
+                    </div>
+                  </div>
+                  {getStatusBadge(getIntegrationStatus('gemini'))}
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="text-sm text-gray-600">Use a IA do Google Gemini para gerar respostas personalizadas para seus clientes.</div>
+                  <Button onClick={testGeminiConnection} disabled={connecting === 'gemini'} className="bg-purple-600 hover:bg-purple-700">
+                    {connecting === 'gemini' ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Bot className="w-4 h-4 mr-2" />} Testar Conexão
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </motion.div>
         </div>
-
-        {/* Logs */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">Logs de Integração</h2>
-            <Button variant="outline" onClick={() => setShowLogs(!showLogs)}>
-              <Eye className="w-4 h-4 mr-2" />
-              {showLogs ? 'Ocultar Logs' : 'Mostrar Logs'}
-            </Button>
-          </div>
-          {showLogs && (
-            <Card>
-              <CardContent className="p-4 max-h-96 overflow-y-auto">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="mb-8">
+          <Alert className="border-blue-200 bg-blue-50">
+            <AlertCircle className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-800">
+              <strong>Configuração necessária:</strong> Para que as integrações funcionem, configure as variáveis secretas no Supabase.
+            </AlertDescription>
+          </Alert>
+        </motion.div>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+          <Card className="border-0 shadow-sm">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">Logs de Atividade</CardTitle>
+                <Button variant="outline" size="sm" onClick={() => setShowLogs(!showLogs)}>
+                  <Eye className="w-4 h-4 mr-2" /> {showLogs ? 'Ocultar' : 'Ver Logs'}
+                </Button>
+              </div>
+            </CardHeader>
+            {showLogs && (
+              <CardContent>
                 {logs.length > 0 ? (
-                  <div className="space-y-2">
-                    {logs.map(log => (
-                      <div key={log.id} className="text-xs font-mono p-2 bg-gray-100 rounded flex items-start space-x-2">
-                        <span className="text-gray-500 whitespace-nowrap">{new Date(log.created_at).toLocaleString('pt-BR')}</span>
-                        <span className={`font-bold ${log.status === 'success' ? 'text-green-600' : log.status === 'error' ? 'text-red-600' : 'text-blue-600'}`}>[{log.action.toUpperCase()}]</span>
-                        <span className="flex-1">{log.message}</span>
-                      </div>
-                    ))}
-                  </div>
+                  <ScrollArea className="h-72">
+                    <div className="space-y-3 pr-4">
+                      {logs.map((log) => {
+                        const statusClasses = getLogStatusClasses(log.status);
+                        return (
+                          <div key={log.id} className="flex items-start space-x-3 p-3 bg-white rounded-lg border text-sm">
+                            <div className="flex-shrink-0 pt-1">
+                              <div className={`w-2.5 h-2.5 rounded-full ${statusClasses.dot}`} />
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-2 mb-1">
+                                <Badge variant="outline" className="text-xs">{log.integration_type}</Badge>
+                                <span className="text-xs text-gray-500 font-mono">{log.action}</span>
+                                <span className="text-xs text-gray-400 flex-1 text-right">{new Date(log.created_at).toLocaleString()}</span>
+                              </div>
+                              <div className={`${statusClasses.text} font-medium`}>{log.message}</div>
+                              {log.details && (
+                                <details className="mt-1 text-xs">
+                                  <summary className="cursor-pointer text-gray-500">Detalhes</summary>
+                                  <pre className="mt-1 p-2 bg-gray-50 border rounded-md font-mono text-gray-600 whitespace-pre-wrap break-all">
+                                    {JSON.stringify(log.details, null, 2)}
+                                  </pre>
+                                </details>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </ScrollArea>
                 ) : (
-                  <p className="text-sm text-center text-gray-500 py-4">Nenhum log encontrado.</p>
+                  <div className="text-center py-8 text-gray-500">Nenhum log encontrado</div>
                 )}
               </CardContent>
-            </Card>
-          )}
+            )}
+          </Card>
         </motion.div>
       </main>
     </div>
@@ -325,4 +325,3 @@ const Integrations = () => {
 };
 
 export default Integrations;
-
