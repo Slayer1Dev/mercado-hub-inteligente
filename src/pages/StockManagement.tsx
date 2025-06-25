@@ -448,46 +448,77 @@ const GroupDetailView = ({ group, onBack, onGroupUpdate }: { group: GroupDetail;
         }
     };
 
+    // Função atualizada e localizada
     const handleStatusChange = async (product: Product, newStatus: 'active' | 'paused') => {
         setUpdatingStatus(product.id);
         try {
             const headers = await getAuthHeaders();
-            await supabase.functions.invoke('update-ml-status', {
-                body: { item_id: product.ml_item_id, status: newStatus },
+            const bodyPayload = {
+                item_id: product.ml_item_id,
+                status: newStatus
+            };
+
+            // Invocando a função e tratando o erro se a chamada falhar
+            const { error } = await supabase.functions.invoke('update-ml-status', {
+                body: bodyPayload, // A função invoke automaticamente converte para JSON
                 headers,
             });
-            toast.success(`Anúncio "${product.title}" está sendo ${newStatus === 'active' ? 'ativado' : 'pausado'}.`);
-            onGroupUpdate();
+
+            // Se a chamada da função retornar um erro, lança para o bloco catch
+            if (error) {
+                throw error;
+            }
+
+            toast.success(
+                t('groupDetail.statusChangeSuccess', {
+                    title: product.title,
+                    action: newStatus === 'active' ? t('groupDetail.activated') : t('groupDetail.paused')
+                })
+            );
+            // Adiciona um pequeno delay para dar tempo da API do ML processar antes de recarregar
+            setTimeout(() => {
+                onGroupUpdate();
+            }, 2000);
+
         } catch (error: any) {
-            toast.error("Falha ao alterar status.", { description: error.message });
+            toast.error(t('groupDetail.statusChangeError'), {
+                description: error.message || t('groupDetail.statusChangeErrorDescription')
+            });
+            console.error("Erro detalhado ao alterar status:", error);
         } finally {
+            // A remoção do status de loading é feita após o onGroupUpdate para melhor feedback visual
             setUpdatingStatus(null);
         }
     };
     
+    // Localização dos textos do componente
+    // É necessário importar o hook de tradução no início do componente:
+    // import { useTranslation } from 'react-i18next';
+    // ...
+    // const { t } = useTranslation();
     return (
         <div className="flex flex-col min-h-screen bg-gray-50">
             <AppHeader />
             <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <Button variant="ghost" onClick={onBack} className="mb-4"><ArrowLeft className="mr-2 h-4 w-4" /> Voltar para todos os grupos</Button>
+                <Button variant="ghost" onClick={onBack} className="mb-4"><ArrowLeft className="mr-2 h-4 w-4" /> {t('groupDetail.backToGroups', 'Voltar para todos os grupos')}</Button>
                 <Card>
                     <CardHeader>
                         <div className="flex justify-between items-start">
                             <div>
                                 <CardTitle className="text-2xl">{group.group_name}</CardTitle>
-                                <CardDescription>{group.products.length} produtos neste grupo.</CardDescription>
+                                <CardDescription>{t('groupDetail.productsInGroup', { count: group.products.length, defaultValue: '{{count}} produtos neste grupo.' })}</CardDescription>
                             </div>
                             <div className="flex space-x-2 items-center">
                                 <Input 
                                     type="number" 
-                                    placeholder="Estoque Mestre" 
+                                    placeholder={t('groupDetail.masterStock', 'Estoque Mestre')} 
                                     className="w-32"
                                     value={masterStock}
                                     onChange={e => setMasterStock(e.target.value)}
                                 />
                                 <Button onClick={handleUpdateAllStock} disabled={isSavingStock}>
                                     {isSavingStock && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                                    Salvar Estoque
+                                    {t('groupDetail.saveStock', 'Salvar Estoque')}
                                 </Button>
                             </div>
                         </div>
@@ -496,11 +527,11 @@ const GroupDetailView = ({ group, onBack, onGroupUpdate }: { group: GroupDetail;
                         <Table>
                             <TableHeader>
                               <TableRow>
-                                <TableHead className="w-[80px]">Imagem</TableHead>
-                                <TableHead>Título</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead className="text-right">Estoque</TableHead>
-                                <TableHead className="text-right">Ações</TableHead>
+                                <TableHead className="w-[80px]">{t('groupDetail.image', 'Imagem')}</TableHead>
+                                <TableHead>{t('groupDetail.title', 'Título')}</TableHead>
+                                <TableHead>{t('groupDetail.status', 'Status')}</TableHead>
+                                <TableHead className="text-right">{t('groupDetail.stock', 'Estoque')}</TableHead>
+                                <TableHead className="text-right">{t('groupDetail.actions', 'Ações')}</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -513,21 +544,21 @@ const GroupDetailView = ({ group, onBack, onGroupUpdate }: { group: GroupDetail;
                                         </TableCell>
                                         <TableCell className="text-right font-semibold">{product.stock_quantity}</TableCell>
                                         <TableCell className="text-right">
-                                            <Badge variant={product.status === 'active' ? 'default' : 'secondary'}>{product.status === 'active' ? 'Ativo' : 'Pausado'}</Badge>
+                                            <Badge variant={product.status === 'active' ? 'default' : 'secondary'}>{product.status === 'active' ? t('groupDetail.active', 'Ativo') : t('groupDetail.paused', 'Pausado')}</Badge>
                                         </TableCell>
                                         <TableCell className="text-right">
                                             {updatingStatus === product.id ? (
                                                 <Loader2 className="h-4 w-4 animate-spin ml-auto" />
                                             ) : (
                                                 product.status === 'active' ? (
-                                                    <Button size="sm" variant="destructive" onClick={() => handleStatusChange(product, 'paused')}>Pausar</Button>
+                                                    <Button size="sm" variant="destructive" onClick={() => handleStatusChange(product, 'paused')}>{t('groupDetail.pause', 'Pausar')}</Button>
                                                 ) : (
-                                                    <Button size="sm" onClick={() => handleStatusChange(product, 'active')}>Ativar</Button>
+                                                    <Button size="sm" onClick={() => handleStatusChange(product, 'active')}>{t('groupDetail.activate', 'Ativar')}</Button>
                                                 )
                                             )}
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <Button variant="destructive" size="sm" onClick={() => handleRemoveProduct(product.id)}><Trash2 className="h-4 w-4 mr-2" /> Remover</Button>
+                                            <Button variant="destructive" size="sm" onClick={() => handleRemoveProduct(product.id)}><Trash2 className="h-4 w-4 mr-2" /> {t('groupDetail.remove', 'Remover')}</Button>
                                         </TableCell>
                                     </TableRow>
                                 ))}
