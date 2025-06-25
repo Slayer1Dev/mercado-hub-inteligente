@@ -1,11 +1,13 @@
+// src/pages/Billing.tsx
 
 import { motion } from "framer-motion";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { UserButton } from "@clerk/clerk-react";
+// import { UserButton } from "@clerk/clerk-react"; // LINHA REMOVIDA
 import { Link } from "react-router-dom";
 import { ArrowLeft, CreditCard, Download, Calendar } from "lucide-react";
+import AppHeader from "@/components/AppHeader"; // Header correto importado
 
 const Billing = () => {
   // Mock billing data
@@ -25,26 +27,8 @@ const Billing = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-4">
-              <Link to="/dashboard">
-                <Button variant="ghost" size="sm">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Voltar
-                </Button>
-              </Link>
-              <h1 className="text-xl font-semibold text-gray-900">Cobrança</h1>
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              <UserButton />
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Usando o AppHeader padronizado */}
+      <AppHeader />
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-8">
