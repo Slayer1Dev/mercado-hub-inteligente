@@ -18,7 +18,7 @@ import {
   AlertCircle,
   RefreshCw,
   Eye,
-  Unplug // Ícone novo
+  Unplug
 } from 'lucide-react';
 import { toast } from 'sonner';
 import AppHeader from '@/components/AppHeader';
@@ -118,7 +118,6 @@ const Integrations = () => {
     }
   };
 
-  // NOVA FUNÇÃO PARA DESCONECTAR
   const disconnectMercadoLivre = async () => {
     setConnecting('disconnect_ml');
     toast.info("Desconectando do Mercado Livre...");
@@ -128,7 +127,7 @@ const Integrations = () => {
         if (error) throw error;
 
         toast.success("Desconectado com sucesso!", { description: "Você pode se conectar novamente a qualquer momento." });
-        await loadIntegrations(); // Recarrega o estado das integrações
+        await loadIntegrations();
     } catch (error: any) {
         toast.error('Erro ao desconectar do Mercado Livre', { description: error.message });
     } finally {
@@ -250,7 +249,6 @@ const Integrations = () => {
                         <Button onClick={syncQuestions} disabled={connecting === 'sync'} variant="outline">
                           {connecting === 'sync' ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />} Sincronizar Perguntas
                         </Button>
-                        {/* BOTÃO DE DESCONECTAR ADICIONADO */}
                         <Button onClick={disconnectMercadoLivre} disabled={connecting === 'disconnect_ml'} variant="destructive">
                           {connecting === 'disconnect_ml' ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Unplug className="w-4 h-4 mr-2" />} Desconectar
                         </Button>

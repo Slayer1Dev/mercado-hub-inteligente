@@ -157,7 +157,6 @@ async function handleSyncProducts(req: Request, supabase: any, user: any) {
     return new Response(JSON.stringify({ message: successMessage }), { headers: corsHeaders });
 }
 
-// NOVA FUNÇÃO PARA DESCONECTAR
 async function handleDisconnect(req: Request, supabase: any, user: any) {
   await createLog(supabase, user.id, 'disconnect', 'info', 'Iniciando desconexão do Mercado Livre.', null);
 
@@ -195,12 +194,10 @@ serve(async (req) => {
   const { pathname } = url;
   
   try {
-    // Rotas públicas
     if (pathname.includes('/oauth-callback')) {
       return await handleOAuthCallback(req, supabase);
     }
 
-    // A partir daqui, rotas protegidas
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       throw new Error('Token de autorização ausente');
@@ -211,14 +208,12 @@ serve(async (req) => {
       throw new Error('Usuário não autenticado');
     }
 
-    // Roteamento
     if (pathname.includes('/oauth-start')) {
       return await handleOAuthStart(req, supabase, user);
     }
     if (pathname.includes('/sync-products')) {
       return await handleSyncProducts(req, supabase, user);
     }
-    // NOVA ROTA ADICIONADA
     if (pathname.includes('/disconnect')) {
       return await handleDisconnect(req, supabase, user);
     }
