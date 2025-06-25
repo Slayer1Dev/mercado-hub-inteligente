@@ -308,7 +308,38 @@ const StockManagement = () => {
                             <TableCell className="font-medium max-w-sm truncate" title={product.title}>{product.title}</TableCell>
                             <TableCell><Badge variant={product.status === 'active' ? 'default' : 'secondary'}>{product.status}</Badge></TableCell>
                             <TableCell className="text-right">R$ {product.price?.toFixed(2)}</TableCell>
-                            <TableCell className="text-right font-semibold">{product.stock_quantity}</TableCell>
+                            <TableCell className="text-right font-semibold">
+                              {product.stock_quantity}
+                              <form
+                                style={{ display: 'inline-flex', alignItems: 'center', marginLeft: 8 }}
+                                onSubmit={async (e) => {
+                                  e.preventDefault();
+                                  const form = e.target as HTMLFormElement;
+                                  const input = form.elements.namedItem('inc') as HTMLInputElement;
+                                  const inc = parseInt(input.value, 10) || 1;
+                                  const { error } = await supabase
+                                    .from('products')
+                                    .update({ stock_quantity: product.stock_quantity + inc })
+                                    .eq('id', product.id);
+                                  if (error) {
+                                    toast.error('Erro ao incrementar estoque.', { description: error.message });
+                                  } else {
+                                    setProducts((prev) => prev.map(p => p.id === product.id ? { ...p, stock_quantity: p.stock_quantity + inc } : p));
+                                    toast.success(`Estoque incrementado em +${inc}`);
+                                  }
+                                  input.value = '1';
+                                }}
+                              >
+                                <input
+                                  name="inc"
+                                  type="number"
+                                  min={1}
+                                  defaultValue={1}
+                                  style={{ width: 40, marginLeft: 4, marginRight: 4, fontSize: 12, padding: 2, border: '1px solid #ddd', borderRadius: 4 }}
+                                />
+                                <Button size="sm" type="submit" style={{ minWidth: 24, padding: 0 }} title="Incrementar estoque">+</Button>
+                              </form>
+                            </TableCell>
                             <TableCell>
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
