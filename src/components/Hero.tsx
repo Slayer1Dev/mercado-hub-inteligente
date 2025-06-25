@@ -10,8 +10,7 @@ const Hero = () => {
   const { user } = useAuth(); // Alterado aqui
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-      {/* ... o resto do seu código de animação que não precisa mudar ... */}
+<section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16">      {/* ... o resto do seu código de animação que não precisa mudar ... */}
       <div className="absolute inset-0 parallax-bg"></div>
       <div className="absolute inset-0 overflow-hidden">
         <motion.div animate={{ y: [0, -20, 0], rotate: [0, 5, 0] }} transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }} className="absolute top-20 left-10 w-16 h-16 bg-white/10 rounded-full backdrop-blur-sm" />
