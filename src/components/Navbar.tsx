@@ -1,30 +1,31 @@
+// src/components/Navbar.tsx
 
 import { useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { SignInButton, SignUpButton, UserButton, useUser } from "@clerk/clerk-react";
+import { useAuth } from "@/hooks/useAuth"; 
 import { Link } from "react-router-dom";
 import { Menu, X, Zap } from "lucide-react";
 import { motion } from "framer-motion";
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 
 const Navbar = () => {
-  const { isSignedIn } = useUser();
+  const { loading, user, profile } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const scrollToFeatures = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
-    const featuresSection = document.getElementById('features');
-    if (featuresSection) {
-      featuresSection.scrollIntoView({ behavior: 'smooth' });
-    }
+    document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
   };
 
   const scrollToPricing = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
-    const pricingSection = document.getElementById('pricing');
-    if (pricingSection) {
-      pricingSection.scrollIntoView({ behavior: 'smooth' });
-    }
+    document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
   };
+  
+  const getInitials = (name?: string | null, email?: string) => {
+    if (name) return name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+    return email?.charAt(0).toUpperCase() || 'U';
+  }
 
   return (
     <motion.nav 
@@ -43,77 +44,37 @@ const Navbar = () => {
           </Link>
 
           <div className="hidden md:flex items-center space-x-8">
-            <Link to="/" className="text-gray-700 hover:text-blue-600 transition-colors">
-              Home
-            </Link>
-            <a href="#features" onClick={scrollToFeatures} className="text-gray-700 hover:text-blue-600 transition-colors cursor-pointer">
-              Recursos
-            </a>
-            <a href="#pricing" onClick={scrollToPricing} className="text-gray-700 hover:text-blue-600 transition-colors cursor-pointer">
-              Preços
-            </a>
+            <a href="#features" onClick={scrollToFeatures} className="text-gray-700 hover:text-blue-600 transition-colors cursor-pointer">Recursos</a>
+            <a href="#pricing" onClick={scrollToPricing} className="text-gray-700 hover:text-blue-600 transition-colors cursor-pointer">Preços</a>
             
-            {isSignedIn ? (
-              <div className="flex items-center space-x-4">
-                <Link to="/dashboard">
-                  <Button variant="outline">Dashboard</Button>
-                </Link>
-                <UserButton />
-              </div>
-            ) : (
-              <div className="flex items-center space-x-4">
-                <SignInButton>
-                  <Button variant="outline">Entrar</Button>
-                </SignInButton>
-                <SignUpButton>
-                  <Button>Começar Agora</Button>
-                </SignUpButton>
-              </div>
+            {!loading && (
+              user ? (
+                <div className="flex items-center space-x-4">
+                  <Link to="/dashboard">
+                    <Button variant="outline">Dashboard</Button>
+                  </Link>
+                  <Link to="/settings">
+                    <Avatar className="h-9 w-9 cursor-pointer">
+                      <AvatarImage src={`https://ui-avatars.com/api/?name=${profile?.name || profile?.email}&background=random`} />
+                      <AvatarFallback>{getInitials(profile?.name, profile?.email)}</AvatarFallback>
+                    </Avatar>
+                  </Link>
+                </div>
+              ) : (
+                <div className="flex items-center space-x-4">
+                  <Link to="/auth"><Button variant="outline">Entrar</Button></Link>
+                  <Link to="/auth"><Button>Começar Agora</Button></Link>
+                </div>
+              )
             )}
           </div>
 
           <div className="md:hidden">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-            >
+            <Button variant="ghost" size="icon" onClick={() => setIsMenuOpen(!isMenuOpen)}>
               {isMenuOpen ? <X /> : <Menu />}
             </Button>
           </div>
         </div>
-
-        {isMenuOpen && (
-          <motion.div 
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="md:hidden bg-white border-t border-gray-200"
-          >
-            <div className="px-2 pt-2 pb-3 space-y-1">
-              <Link to="/" className="block px-3 py-2 text-gray-700">Home</Link>
-              <a href="#features" onClick={scrollToFeatures} className="block px-3 py-2 text-gray-700 cursor-pointer">Recursos</a>
-              <a href="#pricing" onClick={scrollToPricing} className="block px-3 py-2 text-gray-700 cursor-pointer">Preços</a>
-              {isSignedIn ? (
-                <div className="flex flex-col space-y-2 px-3 py-2">
-                  <Link to="/dashboard">
-                    <Button className="w-full">Dashboard</Button>
-                  </Link>
-                  <UserButton />
-                </div>
-              ) : (
-                <div className="flex flex-col space-y-2 px-3 py-2">
-                  <SignInButton>
-                    <Button variant="outline" className="w-full">Entrar</Button>
-                  </SignInButton>
-                  <SignUpButton>
-                    <Button className="w-full">Começar Agora</Button>
-                  </SignUpButton>
-                </div>
-              )}
-            </div>
-          </motion.div>
-        )}
       </div>
     </motion.nav>
   );
