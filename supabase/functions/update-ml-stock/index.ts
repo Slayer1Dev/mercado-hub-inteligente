@@ -1,5 +1,3 @@
-// supabase/functions/update-ml-status/index.ts
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { getValidAccessToken, createLog } from '../_shared/ml-auth.ts';
@@ -20,35 +18,40 @@ serve(async (req) => {
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) throw new Error('Token de autorização ausente');
-
+    
     const { data: { user } } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
     if (!user) throw new Error('Usuário não autenticado');
     userIdForLog = user.id;
 
-    const { item_id, status } = await req.json();
-    if (!item_id || !['active', 'paused'].includes(status)) {
-      throw new Error('Parâmetros inválidos: item_id e status ("active" ou "paused") são necessários.');
+    const { item_ids, stock } = await req.json();
+    if (!item_ids || !Array.isArray(item_ids) || stock === undefined || isNaN(Number(stock))) {
+      throw new Error('Parâmetros inválidos: item_ids (array) e stock (número) são necessários.');
     }
 
     const accessToken = await getValidAccessToken(supabase, user.id);
-
-    const mlResponse = await fetch(`https://api.mercadolibre.com/items/${item_id}`, {
+    
+    const updates = item_ids.map(itemId => ({
       method: 'PUT',
-      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
-    });
+      path: `/items/${itemId}`,
+      body: { available_quantity: Number(stock) },
+    }));
 
-    if (!mlResponse.ok) {
-      const errorBody = await mlResponse.json();
-      throw new Error(errorBody.message || 'Erro ao atualizar status no Mercado Livre.');
+    const mlResponse = await fetch('https://api.mercadolibre.com/multiget?s=items', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+    
+    if(!mlResponse.ok) {
+        const errorBody = await mlResponse.json();
+        throw new Error(errorBody.message || 'Erro ao atualizar estoque no Mercado Livre.');
     }
 
-    const successMessage = `Anúncio ${status === 'active' ? 'ativado' : 'pausado'}.`;
-    await createLog(supabase, user.id, 'update_status', 'success', successMessage, { item_id });
+    await createLog(supabase, user.id, 'update_stock', 'success', `Estoque de ${item_ids.length} itens atualizado para ${stock}.`, { itemCount: item_ids.length });
+    return new Response(JSON.stringify({ success: true, message: 'Estoque atualizado.' }), { headers: corsHeaders });
 
-    return new Response(JSON.stringify({ success: true, message: successMessage }), { headers: corsHeaders });
   } catch (err) {
-    await createLog(supabase, userIdForLog, 'update_status', 'error', err.message, null);
+    await createLog(supabase, userIdForLog, 'update_stock', 'error', err.message, null);
     return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
   }
 });

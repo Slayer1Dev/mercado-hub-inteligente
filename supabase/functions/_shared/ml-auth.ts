@@ -1,3 +1,5 @@
+// supabase/functions/_shared/ml-auth.ts
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 export async function createLog(supabase: any, userId: string | null, action: string, status: string, message: string, details: any = null) {
@@ -41,7 +43,7 @@ export async function getValidAccessToken(supabase: any, userId: string): Promis
     const ML_CLIENT_SECRET = Deno.env.get('ML_CLIENT_SECRET');
 
     if (!ML_CLIENT_ID || !ML_CLIENT_SECRET) {
-        await createLog(supabase, userId, 'refresh_token', 'error', 'CONFIGURAÇÃO FALTANDO: As variáveis ML_CLIENT_ID ou ML_CLIENT_SECRET não foram encontradas no servidor.', null);
+        await createLog(supabase, userId, 'refresh_token', 'error', 'CONFIGURAÇÃO FALTANDO: ML_CLIENT_ID ou ML_CLIENT_SECRET não encontrados no servidor.', null);
         throw new Error('Configuração de integração do Mercado Livre incompleta no servidor.');
     }
 

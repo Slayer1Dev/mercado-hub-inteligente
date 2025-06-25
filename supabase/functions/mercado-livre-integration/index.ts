@@ -20,10 +20,8 @@ async function handleOAuthStart(req: Request, supabase: any, user: any) {
   }
   
   const redirectUri = `${Deno.env.get('SUPABASE_URL')}/functions/v1/mercado-livre-integration/oauth-callback`;
-  
-  // CORREÇÃO: Adicionados escopos 'write' e 'offline_access' para permitir todas as ações.
   const scopes = 'read write offline_access';
-  const authUrl = `https://auth.mercadolibre.com.br/authorization?response_type=code&client_id=${ML_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${user.id}&scope=${encodeURIComponent(scopes)}`;
+  const authUrl = `https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=${ML_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${user.id}&scope=${encodeURIComponent(scopes)}`;
 
   return new Response(JSON.stringify({ authUrl }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -31,52 +29,52 @@ async function handleOAuthStart(req: Request, supabase: any, user: any) {
 }
 
 async function handleOAuthCallback(req: Request, supabase: any) {
-  const url = new URL(req.url);
-  const code = url.searchParams.get('code');
-  const state = url.searchParams.get('state'); // user_id
-
-  if (!code || !state) {
-    throw new Error('Parâmetros inválidos no callback do Mercado Livre.');
-  }
-
-  const ML_CLIENT_ID = Deno.env.get('ML_CLIENT_ID');
-  const ML_CLIENT_SECRET = Deno.env.get('ML_CLIENT_SECRET');
-  const redirectUri = `${Deno.env.get('SUPABASE_URL')}/functions/v1/mercado-livre-integration/oauth-callback`;
-
-  const body = `grant_type=authorization_code&client_id=${ML_CLIENT_ID}&client_secret=${ML_CLIENT_SECRET}&code=${code}&redirect_uri=${redirectUri}`;
-
-  const tokenResponse = await fetch('https://api.mercadolibre.com/oauth/token', {
-    method: 'POST',
-    headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-  });
-
-  if (!tokenResponse.ok) {
-    const errorData = await tokenResponse.text();
-    await createLog(supabase, state, 'oauth_callback', 'error', 'Falha ao obter tokens do ML.', { error: errorData });
-    throw new Error('Falha na autenticação com o Mercado Livre.');
-  }
-
-  const tokens = await tokenResponse.json();
+    const url = new URL(req.url);
+    const code = url.searchParams.get('code');
+    const state = url.searchParams.get('state'); // user_id
   
-  await supabase.from('user_integrations').upsert({
-      user_id: state,
-      integration_type: 'mercado_livre',
-      is_connected: true,
-      credentials: {
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-        ml_user_id: tokens.user_id,
-        expires_in: tokens.expires_in,
-        token_type: tokens.token_type,
-      },
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'user_id, integration_type' });
-
-  await createLog(supabase, state, 'oauth_callback', 'success', 'Integração com Mercado Livre conectada com sucesso.', null);
-
-  const SITE_URL = Deno.env.get('SITE_URL') || 'http://localhost:5173';
-  return Response.redirect(`${SITE_URL}/integrations?connected=mercado_livre`);
+    if (!code || !state) {
+      throw new Error('Parâmetros inválidos no callback do Mercado Livre.');
+    }
+  
+    const ML_CLIENT_ID = Deno.env.get('ML_CLIENT_ID');
+    const ML_CLIENT_SECRET = Deno.env.get('ML_CLIENT_SECRET');
+    const redirectUri = `${Deno.env.get('SUPABASE_URL')}/functions/v1/mercado-livre-integration/oauth-callback`;
+  
+    const body = `grant_type=authorization_code&client_id=${ML_CLIENT_ID}&client_secret=${ML_CLIENT_SECRET}&code=${code}&redirect_uri=${redirectUri}`;
+  
+    const tokenResponse = await fetch('https://api.mercadolibre.com/oauth/token', {
+      method: 'POST',
+      headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    });
+  
+    if (!tokenResponse.ok) {
+      const errorData = await tokenResponse.text();
+      await createLog(supabase, state, 'oauth_callback', 'error', 'Falha ao obter tokens do ML.', { error: errorData });
+      throw new Error('Falha na autenticação com o Mercado Livre.');
+    }
+  
+    const tokens = await tokenResponse.json();
+    
+    await supabase.from('user_integrations').upsert({
+        user_id: state,
+        integration_type: 'mercado_livre',
+        is_connected: true,
+        credentials: {
+          access_token: tokens.access_token,
+          refresh_token: tokens.refresh_token,
+          ml_user_id: tokens.user_id,
+          expires_in: tokens.expires_in,
+          token_type: tokens.token_type,
+        },
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id, integration_type' });
+  
+    await createLog(supabase, state, 'oauth_callback', 'success', 'Integração com Mercado Livre conectada com sucesso.', null);
+  
+    const SITE_URL = Deno.env.get('SITE_URL') || 'http://localhost:5173';
+    return Response.redirect(`${SITE_URL}/integrations?connected=mercado_livre`);
 }
 
 async function handleSyncProducts(req: Request, supabase: any, user: any) {
@@ -159,6 +157,7 @@ async function handleSyncProducts(req: Request, supabase: any, user: any) {
     return new Response(JSON.stringify({ message: successMessage }), { headers: corsHeaders });
 }
 
+
 // --- Servidor Principal ---
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -174,13 +173,12 @@ serve(async (req) => {
   const { pathname } = url;
   
   try {
-    // Rotas públicas que não precisam de autenticação de usuário
+    // Rotas públicas
     if (pathname.includes('/oauth-callback')) {
       return await handleOAuthCallback(req, supabase);
     }
-    // Adicione a rota de webhook aqui se precisar que seja pública
 
-    // A partir daqui, todas as rotas precisam de um usuário autenticado
+    // A partir daqui, rotas protegidas
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       throw new Error('Token de autorização ausente');
@@ -191,18 +189,16 @@ serve(async (req) => {
       throw new Error('Usuário não autenticado');
     }
 
-    // Roteamento para as funções protegidas
+    // Roteamento
     if (pathname.includes('/oauth-start')) {
       return await handleOAuthStart(req, supabase, user);
     }
     if (pathname.includes('/sync-products')) {
       return await handleSyncProducts(req, supabase, user);
     }
-    // Adicione outras rotas protegidas aqui (sync-questions, answer-question, etc.)
-
+    
     return new Response(JSON.stringify({ error: "Rota não encontrada" }), { status: 404, headers: corsHeaders });
   } catch (err) {
-    console.error('Erro na Edge Function:', err.message);
     return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
   }
 });

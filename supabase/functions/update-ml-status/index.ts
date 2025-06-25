@@ -48,7 +48,7 @@ serve(async (req) => {
       throw new Error(errorBody.message || 'Erro ao atualizar status no Mercado Livre.');
     }
 
-    // 2. CORREÇÃO: Atualiza o status no seu banco de dados local para manter consistência
+    // 2. Atualiza o status no seu banco de dados local para manter consistência
     await supabase
       .from('products')
       .update({ status: status })
@@ -58,7 +58,7 @@ serve(async (req) => {
     const successMessage = `Anúncio ${status === 'active' ? 'ativado' : 'pausado'}.`;
     await createLog(supabase, user.id, 'update_status', 'success', successMessage, { item_id });
     
-    return new Response(JSON.stringify({ success: true, message: successMessage }), { headers: corsHeaders });
+    return new Response(JSON.stringify({ success: true, message: successMessage }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (err) {
     await createLog(supabase, userIdForLog, 'update_status', 'error', err.message, null);
